@@ -1,139 +1,122 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Github, Linkedin } from 'lucide-react';
-import { animate, stagger } from 'animejs';
+import { useRef } from 'react';
+import { GithubLogo, LinkedinLogo } from '@phosphor-icons/react';
 import { team } from '../../data';
-import { premiumEase } from '../../lib/utils';
+import { gsap, useGSAP } from '../../motion/gsap';
+import { MQ } from '../../motion/tokens';
+import SplitReveal from '../ui/SplitReveal';
 
-interface TeamProps {
-  mousePosition: { x: number, y: number };
-}
+/**
+ * Names as a list. On mouse devices a portrait follows the pointer and swaps as you
+ * move between rows; on touch each row carries its own portrait.
+ */
+export default function Team() {
+  const root = useRef<HTMLElement>(null);
+  const follower = useRef<HTMLDivElement>(null);
 
-const Team: React.FC<TeamProps> = ({ mousePosition }) => {
-  const [hoveredTeamMember, setHoveredTeamMember] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            animate('.team-member-row', {
-              translateX: {
-                from: -50,
-                to: 0
-              },
-              opacity: {
-                from: 0,
-                to: 1
-              },
-              delay: stagger(100),
-              ease: 'outQuad',
-              duration: 800
-            });
-            observer.disconnect();
-          }
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.from('.team-row', {
+          y: 40,
+          opacity: 0,
+          duration: 0.9,
+          ease: 'ax.out',
+          stagger: 0.08,
+          scrollTrigger: { trigger: '.team-list', start: 'top 85%', once: true },
         });
-      },
-      { threshold: 0.1 }
-    );
+      });
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+      mm.add(`${MQ.finePointer} and (min-width: 768px)`, () => {
+        const el = follower.current!;
+        const reduce = window.matchMedia(MQ.reduce).matches;
+        const x = gsap.quickTo(el, 'x', { duration: reduce ? 0 : 0.6, ease: 'ax.out' });
+        const y = gsap.quickTo(el, 'y', { duration: reduce ? 0 : 0.6, ease: 'ax.out' });
+        const rot = gsap.quickTo(el, 'rotation', { duration: 0.8, ease: 'ax.out' });
+        let lastX = 0;
+        const imgs = gsap.utils.toArray<HTMLElement>('.team-portrait');
+        const list = root.current!.querySelector<HTMLElement>('.team-list')!;
 
-    return () => observer.disconnect();
-  }, []);
+        const move = (e: PointerEvent) => {
+          x(e.clientX + 32);
+          y(e.clientY - 180);
+          if (!reduce) rot(gsap.utils.clamp(-8, 8, (e.clientX - lastX) * 0.6));
+          lastX = e.clientX;
+        };
+        const show = (i: number) => {
+          imgs.forEach((img, j) => gsap.to(img, { autoAlpha: j === i ? 1 : 0, scale: j === i ? 1 : 1.08, duration: 0.45, ease: 'ax.out', overwrite: true }));
+          gsap.to(el, { autoAlpha: 1, scale: 1, duration: 0.4, ease: 'ax.out', overwrite: 'auto' });
+        };
+        const hide = () => gsap.to(el, { autoAlpha: 0, scale: 0.92, duration: 0.3, ease: 'ax.out', overwrite: 'auto' });
+        const rows = gsap.utils.toArray<HTMLElement>('.team-row');
+        const enters = rows.map((row, i) => {
+          const fn = () => show(i);
+          row.addEventListener('pointerenter', fn);
+          return fn;
+        });
+        gsap.set(el, { autoAlpha: 0, scale: 0.92 });
+        window.addEventListener('pointermove', move, { passive: true });
+        list.addEventListener('pointerleave', hide);
+        return () => {
+          window.removeEventListener('pointermove', move);
+          list.removeEventListener('pointerleave', hide);
+          rows.forEach((row, i) => row.removeEventListener('pointerenter', enters[i]));
+        };
+      });
+      return () => mm.revert();
+    },
+    { scope: root },
+  );
 
   return (
-    <section id="team" className="py-32 px-6 md:px-12 bg-[#040605] border-y border-white/10 relative z-10 text-white">
-      <div 
-        className="absolute inset-0 z-0 opacity-[0.18] pointer-events-none" 
-        style={{ 
-          backgroundImage: 'radial-gradient(#CCFF00 1.2px, transparent 1.2px)', 
-          backgroundSize: '36px 36px' 
-        }}
-      ></div>
+    <section ref={root} id="team" data-chrome="light" className="relative min-h-[100svh] bg-ink pb-24 pt-36 md:pb-40 md:pt-48">
+      <div className="container-x">
+        <SplitReveal as="h1" on="intro" by="chars" className="text-display text-[clamp(3.75rem,13vw,12rem)] leading-[0.85]">
+          The Collective
+        </SplitReveal>
+        <SplitReveal as="p" on="intro" delay={0.35} className="mt-8 max-w-[44ch] text-lg leading-relaxed text-white/65 md:text-2xl">
+          Engineers by day. Elite freelancers by night. We combine enterprise-grade experience with creative agility.
+        </SplitReveal>
 
-      {/* Technical Grid Coordinates Backdrop */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-[0.03]">
-        <div className="absolute top-10 left-10 font-mono text-[9px]">COORD: [AX-01] // SYS_LAT_8.2ms</div>
-        <div className="absolute top-10 right-10 font-mono text-[9px]">GRID: [L-4] // NODE_15_OK</div>
-        <div className="absolute bottom-10 left-10 font-mono text-[9px]">LAT: 12.91° N // LON: 77.59° E</div>
-        <div className="absolute bottom-10 right-10 font-mono text-[9px]">ENGINE_UP: [2026]</div>
-      </div>
-      
-      {/* Floating Image element (desktop only) */}
-      <AnimatePresence>
-        {hoveredTeamMember !== null && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.4, ease: premiumEase }}
-            className="fixed z-50 pointer-events-none hidden md:block w-72 h-96 overflow-hidden rounded-xl border border-white/20 shadow-2xl"
-            style={{
-              left: mousePosition.x + 40,
-              top: mousePosition.y - 192,
-            }}
-          >
-            <img 
-              src={team.find(t => t.id === hoveredTeamMember)?.image} 
-              alt="Team member" 
-              className="w-full h-full object-cover"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="max-w-5xl mx-auto px-6 md:px-12">
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 1, ease: premiumEase }}
-          className="mb-20"
-        >
-          <h2 className="text-6xl md:text-8xl font-bold tracking-tighter uppercase mb-6">The Collective</h2>
-          <p className="text-2xl text-gray-400 max-w-2xl font-light">Engineers by day. Elite freelancers by night. We combine enterprise-grade experience with creative agility.</p>
-        </motion.div>
-
-        <div ref={containerRef} className="flex flex-col relative">
-          {team.map((member, index) => (
-            <div 
-              key={member.id}
-              onMouseEnter={() => setHoveredTeamMember(member.id)}
-              onMouseLeave={() => setHoveredTeamMember(null)}
-              className="team-member-row opacity-0 group border-t border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center py-12 md:hover:bg-white/5 transition-colors px-4 -mx-4 md:px-10 md:-mx-10 duration-500 cursor-pointer"
-            >
-              <div className="flex items-center gap-4 md:gap-8 mb-6 md:mb-0 relative z-10">
-                <span className="text-xl font-mono text-gray-500 group-hover:text-[#CCFF00] transition-colors">0{index + 1}</span>
-                
-                {/* Mobile inline avatar */}
-                <div className="md:hidden w-16 h-16 rounded-full overflow-hidden border border-white/15 shrink-0 bg-zinc-900 shadow-lg">
-                  <img 
-                    src={member.image} 
-                    alt={member.name} 
-                    className="w-full h-full object-cover"
-                  />
+        <ul className="team-list mt-16 border-b border-white/12 md:mt-24">
+          {team.map((m, i) => (
+            <li key={m.id} className="team-row group border-t border-white/12">
+              <div className="flex flex-col gap-5 py-8 md:flex-row md:items-center md:justify-between md:py-10">
+                <div className="flex items-center gap-5 md:gap-10">
+                  <span className="tabular w-8 text-sm text-white/45 transition-colors duration-300 group-hover:text-lime">{String(i + 1).padStart(2, '0')}</span>
+                  <img src={m.image} alt="" loading="lazy" className="size-16 shrink-0 rounded-2xl object-cover md:hidden" />
+                  <h2 className="text-display text-[clamp(2.75rem,8vw,7.5rem)] text-white/85 transition-[color,transform] duration-500 ease-(--ease-out) md:group-hover:translate-x-6 md:group-hover:text-white">
+                    {m.name}
+                  </h2>
                 </div>
-                
-                <h3 className="text-4xl md:text-7xl font-bold tracking-tighter uppercase group-hover:text-white md:group-hover:translate-x-8 transition-all duration-500 ease-[0.76,0,0.24,1] text-gray-300">
-                  {member.name}
-                </h3>
-              </div>
-              
-              <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end relative z-10">
-                <span className="text-lg font-mono text-gray-500 uppercase tracking-widest group-hover:text-white transition-colors">{member.role}</span>
-                <div className="flex gap-4">
-                  <a href={member.github} target="_blank" rel="noopener noreferrer" className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-black transition-all duration-300"><Github size={20}/></a>
-                  <a href={member.linkedin} target="_blank" rel="noopener noreferrer" className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-[#CCFF00] group-hover:border-[#CCFF00] group-hover:text-black transition-all duration-300"><Linkedin size={20}/></a>
+                <div className="flex items-center justify-between gap-8 md:justify-end">
+                  <p className="text-base text-white/60 transition-colors duration-300 group-hover:text-white md:text-lg">{m.role}</p>
+                  <div className="flex gap-3">
+                    <a href={m.github} target="_blank" rel="noopener noreferrer" aria-label={`${m.name} on GitHub`} className="pressable grid size-12 place-items-center rounded-full ring-1 ring-white/20 transition-colors duration-200 hover:bg-white hover:text-ink hover:ring-white">
+                      <GithubLogo size={20} />
+                    </a>
+                    <a href={m.linkedin} target="_blank" rel="noopener noreferrer" aria-label={`${m.name} on LinkedIn`} className="pressable grid size-12 place-items-center rounded-full ring-1 ring-white/20 transition-colors duration-200 hover:bg-lime hover:text-ink hover:ring-lime">
+                      <LinkedinLogo size={20} />
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            </li>
           ))}
-          <div className="border-t border-white/10"></div>
-        </div>
+        </ul>
+      </div>
+
+      <div
+        ref={follower}
+        aria-hidden
+        className="pointer-events-none invisible fixed left-0 top-0 hidden h-[22rem] w-[17rem] overflow-hidden rounded-[1.25rem] bg-white/5 md:block"
+        style={{ zIndex: 'var(--z-float)' }}
+      >
+        {team.map((m) => (
+          <img key={m.id} src={m.image} alt="" className="team-portrait invisible absolute inset-0 size-full object-cover" />
+        ))}
       </div>
     </section>
   );
-};
-
-export default Team;
+}

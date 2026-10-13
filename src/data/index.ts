@@ -1,67 +1,29 @@
+import type { Project, ProcessStep, TeamMember, PricingPlan, Testimonial } from '../types';
 
-import { Search, PenTool, Code2, Rocket } from 'lucide-react';
-import type { Project, ProcessStep, ExpertiseItem, TeamMember, PricingPlan, Testimonial } from '../types';
-import main2 from '../assets/main2.jpg';
-import main3 from '../assets/main3.jpg';
-import main4 from '../assets/main4.jpg';
+// Full-page screenshots are resized and re-encoded at build time (originals are up to 12 MB),
+// each with a 560w / 1100w srcset so phones never download the desktop size.
+// (Glob patterns must be literals, hence the repetition.)
+const shotSrc = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg,png}', '../assets/{zoviq-full,doc,pet,polymind,children,aarogyam,spa,zumba}.png'], { query: '?w=1100&quality=72&format=webp', import: 'default', eager: true });
+const shotSet = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg,png}', '../assets/{zoviq-full,doc,pet,polymind,children,aarogyam,spa,zumba}.png'], { query: '?w=560;1100&quality=72&format=webp&as=srcset', import: 'default', eager: true });
+const shot = (file: string) => ({ image: shotSrc[`../assets/${file}`], srcSet: shotSet[`../assets/${file}`] });
 
-import cafe1 from '../assets/cafe1.jpg';
-import cafe2 from '../assets/cafe2.jpg';
-import cafe3 from '../assets/cafe3.jpg';
-import cafe4 from '../assets/cafe4.jpg';
-import cafe5 from '../assets/cafe5.jpg';
-import cafe6 from '../assets/cafe6.jpg';
+// Case study before / after
+import zoviq from '../assets/zoviq.png?w=1200&quality=80&format=webp';
+import zoviqold from '../assets/zoviqold.png?w=1200&quality=80&format=webp';
 
-import soft1 from '../assets/soft1.png';
-import soft2 from '../assets/soft2.png';
-import soft3 from '../assets/soft3.png';
-import soft4 from '../assets/soft4.png';
-import soft5 from '../assets/soft5.png';
-
-import port1 from '../assets/port1.jpg';
-import port2 from '../assets/port2.jpg';
-import port3 from '../assets/port3.png';
-
-import akshar from '../assets/akshar.jpeg';
-import abhinav from '../assets/abhinav.jpeg';
-import adnaan from '../assets/adnaan.jpeg';
-// import chandan from '../assets/chandan.jpeg';
-import bhuvan from '../assets/bhuvan.jpeg';
-
-import zoviq from '../assets/zoviq.png';
-import zoviqold from '../assets/zoviqold.png';
-import doc from '../assets/doc.png';
-import zoviqcopy from '../assets/zoviq copy.png';
-import pet from '../assets/pet.png';
-import polymind from '../assets/polymind.png';
-import children from '../assets/children.png';
-import aarogyam from '../assets/aarogyam.png';
-import spa from '../assets/spa.png';
-import zumba from '../assets/zumba.png';
-
-
-
-
-
-export const preloadImages = [
-  main2, main3, main4,
-  cafe1, cafe2, cafe3, cafe4, cafe5, cafe6,
-  soft1, soft2, soft3, soft4, soft5,
-  port1, port2, port3,
-  akshar, abhinav, adnaan, bhuvan,
-  zoviq, zoviqold
-];
+// Team portraits
+import akshar from '../assets/akshar.jpeg?w=640&quality=78&format=webp';
+import abhinav from '../assets/abhinav.jpeg?w=640&quality=78&format=webp';
+import adnaan from '../assets/adnaan.jpeg?w=640&quality=78&format=webp';
+import bhuvan from '../assets/bhuvan.jpeg?w=640&quality=78&format=webp';
 
 export const projects: Project[] = [
   // Company Portfolios
-
-    {
+  {
     id: 1,
     title: 'Zoviq',
     category: 'Company Portfolio',
-    image: zoviqcopy,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('zoviq-full.png'),
     link: 'https://www.zoviq.page/',
     tags: ['React', 'Vite', 'TailwindCSS']
   },
@@ -69,9 +31,7 @@ export const projects: Project[] = [
     id: 2,
     title: 'ShineGoGlobal',
     category: 'Company Portfolio',
-    image: main4,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('main4.jpg'),
     link: 'https://shinegoglobal.com/',
     tags: ['TypeScript', 'Node.js', 'PostgreSQL']
   },
@@ -80,9 +40,7 @@ export const projects: Project[] = [
     id: 3,
     title: 'Polymind',
     category: 'Company Portfolio',
-    image: polymind,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('polymind.png'),
     link: 'https://polymind.zoviq.page/',
     tags: ['React', 'Vite', 'TailwindCSS']
   },
@@ -90,9 +48,7 @@ export const projects: Project[] = [
     id: 4,
     title: 'DevStudio',
     category: 'Company Portfolio',
-    image: main2,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('main2.jpg'),
     link: 'https://devstudio.axoraa.tech/',
     tags: ['Next.js', 'TailwindCSS', 'Framer Motion']
   },
@@ -100,9 +56,7 @@ export const projects: Project[] = [
     id: 5,
     title: 'DevCollective',
     category: 'Company Portfolio',
-    image: main3,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('main3.jpg'),
     link: 'https://devcollective.axoraa.tech/',
     tags: ['React', 'Vite', 'GSAP']
   },
@@ -111,11 +65,9 @@ export const projects: Project[] = [
   // Medical Systems
   {
     id: 6,
-    title: 'Aarogyam ',
+    title: 'Aarogyam',
     category: 'Medical System',
-    image: aarogyam,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('aarogyam.png'),
     link: 'https://aarogyam.axoraa.tech/',
     tags: ['Next.js', 'React', 'TailwindCSS']
   },
@@ -123,9 +75,7 @@ export const projects: Project[] = [
     id: 7,
     title: 'Doc CRM',
     category: 'Medical System',
-    image: doc,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('doc.png'),
     link: 'https://doc.axoraa.tech/',
     tags: ['React', 'Node.js', 'PostgreSQL']
   },
@@ -135,9 +85,7 @@ export const projects: Project[] = [
     id: 8,
     title: 'SABLE',
     category: 'Cafe Website',
-    image: cafe1,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('cafe1.jpg'),
     link: 'https://sable.axoraa.tech/',
     tags: ['Next.js', 'MongoDB', 'Vercel']
   },
@@ -145,9 +93,7 @@ export const projects: Project[] = [
     id: 9,
     title: 'TERRA',
     category: 'Cafe Website',
-    image: cafe2,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('cafe2.jpg'),
     link: 'https://terra.axoraa.tech/',
     tags: ['React', 'Redux', 'AntD']
   },
@@ -155,9 +101,7 @@ export const projects: Project[] = [
     id: 10,
     title: 'LUMINA',
     category: 'Cafe Website',
-    image: cafe3,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('cafe3.jpg'),
     link: 'https://lumina.axoraa.tech/',
     tags: ['Vue.js', 'TailwindCSS', 'Firebase']
   },
@@ -165,9 +109,7 @@ export const projects: Project[] = [
     id: 11,
     title: 'Ojas Theta',
     category: 'Cafe Website',
-    image: cafe4,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('cafe4.jpg'),
     link: 'https://ojas-theta.vercel.app/',
     tags: ['Svelte', 'Node.js', 'MySQL']
   },
@@ -175,9 +117,7 @@ export const projects: Project[] = [
     id: 12,
     title: 'Masala Modern',
     category: 'Cafe Website',
-    image: cafe5,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('cafe5.jpg'),
     link: 'https://masala-modern.vercel.app/',
     tags: ['Next.js', 'Prisma', 'PostgreSQL']
   },
@@ -185,9 +125,7 @@ export const projects: Project[] = [
     id: 13,
     title: 'Lumière',
     category: 'Cafe Website',
-    image: cafe6,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('cafe6.jpg'),
     link: 'https://new-folder-two-steel.vercel.app/',
     tags: ['React', 'Framer Motion', 'Vite']
   },
@@ -197,9 +135,7 @@ export const projects: Project[] = [
     id: 14,
     title: 'F-Mine',
     category: 'Internal Software',
-    image: soft1,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('soft1.png'),
     link: 'https://restaurant-crm.axoraa.tech/',
     tags: ['React', 'TypeScript', 'Dashboard']
   },
@@ -207,9 +143,7 @@ export const projects: Project[] = [
     id: 15,
     title: 'AI Test Propter',
     category: 'Internal Software',
-    image: soft2,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('soft2.png'),
     link: 'https://ai-test-propter.vercel.app',
     tags: ['Python', 'FastAPI', 'React']
   },
@@ -217,9 +151,7 @@ export const projects: Project[] = [
     id: 16,
     title: 'Sparkonomy',
     category: 'Internal Software',
-    image: soft3,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('soft3.png'),
     link: 'https://sparkonomy.axoraa.tech/',
     tags: ['Next.js', 'Redis', 'TailwindCSS']
   },
@@ -227,9 +159,7 @@ export const projects: Project[] = [
     id: 17,
     title: 'Flam Five',
     category: 'Internal Software',
-    image: soft4,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('soft4.png'),
     link: 'https://flam.axoraa.tech/',
     tags: ['Angular', 'RxJS', 'Node.js']
   },
@@ -237,9 +167,7 @@ export const projects: Project[] = [
     id: 18,
     title: 'Smart Home Dash',
     category: 'Internal Software',
-    image: soft5,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('soft5.png'),
     link: 'https://aksharkh.github.io/Smart-home-dashboard-/',
     tags: ['IoT', 'React', 'MQTT']
   },
@@ -249,9 +177,7 @@ export const projects: Project[] = [
     id: 19,
     title: 'PetCare Portal',
     category: 'Creative Portals',
-    image: pet,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('pet.png'),
     link: 'https://pet.axoraa.tech/',
     tags: ['React', 'Vite', 'TailwindCSS']
   },
@@ -259,9 +185,7 @@ export const projects: Project[] = [
     id: 20,
     title: 'Zumba Studio',
     category: 'Creative Portals',
-    image: zumba,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('zumba.png'),
     link: 'https://zumba.axoraa.tech/',
     tags: ['React', 'GSAP', 'TailwindCSS']
   },
@@ -269,9 +193,7 @@ export const projects: Project[] = [
     id: 21,
     title: 'KinderCare Portal',
     category: 'Creative Portals',
-    image: children,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('children.png'),
     link: 'https://kinder.axoraa.tech/',
     tags: ['Next.js', 'Framer Motion', 'TailwindCSS']
   },
@@ -279,9 +201,7 @@ export const projects: Project[] = [
     id: 22,
     title: 'Aura Spa Portal',
     category: 'Creative Portals',
-    image: spa,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('spa.png'),
     link: 'https://spa.axoraa.tech/',
     tags: ['React', 'TailwindCSS', 'Vercel']
   },
@@ -292,9 +212,7 @@ export const projects: Project[] = [
     id: 23,
     title: 'Bhuvan',
     category: 'Personal Portfolio',
-    image: port1,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('port1.jpg'),
     link: 'https://bhuvanmh.pages.dev/',
     tags: ['HTML', 'CSS', 'JavaScript']
   },
@@ -302,9 +220,7 @@ export const projects: Project[] = [
     id: 24,
     title: 'Abhinav R',
     category: 'Personal Portfolio',
-    image: port2,
-    aspect: 'aspect-[16/10]',
-    col: 'md:col-span-7',
+    ...shot('port2.jpg'),
     link: 'https://my-portfoilo-ashy.vercel.app/',
     tags: ['React', 'Three.js', 'Vercel']
   },
@@ -312,9 +228,7 @@ export const projects: Project[] = [
     id: 25,
     title: 'Akshar',
     category: 'Personal Portfolio',
-    image: port3,
-    aspect: 'aspect-[4/5]',
-    col: 'md:col-span-5',
+    ...shot('port3.png'),
     link: 'https://akshar.axoraa.tech/',
     tags: ['Next.js', 'Sanity', 'TailwindCSS']
   }
@@ -324,51 +238,30 @@ export const processSteps: ProcessStep[] = [
   {
     id: '01',
     title: 'Discovery & Strategy',
-    desc: 'We start by deeply understanding your business goals, target audience, and technical constraints. We define the architecture and set a roadmap for success.',
-    icon: <Search className="w-8 h-8 text-[#CCFF00]" />
+    desc: 'We start by deeply understanding your business goals, target audience, and technical constraints. We define the architecture and set a roadmap for success.'
   },
   {
     id: '02',
     title: 'Design & Prototyping',
-    desc: 'Our design philosophy merges aesthetics with usability. We create wireframes, interactive prototypes, and a visual language that captivates your users.',
-    icon: <PenTool className="w-8 h-8 text-[#CCFF00]" />
+    desc: 'Our design philosophy merges aesthetics with usability. We create wireframes, interactive prototypes, and a visual language that captivates your users.'
   },
   {
     id: '03',
     title: 'Precision Engineering',
-    desc: 'This is where the magic happens. We write clean, modular, and scalable code using React, Node.js, and modern cloud infrastructure.',
-    icon: <Code2 className="w-8 h-8 text-[#CCFF00]" />
+    desc: 'This is where the magic happens. We write clean, modular, and scalable code using React, Node.js, and modern cloud infrastructure.'
   },
   {
     id: '04',
     title: 'Launch & Scale',
-    desc: 'Zero-downtime deployment. We ensure your application is secure, incredibly fast, SEO-optimized, and ready to handle massive amounts of traffic.',
-    icon: <Rocket className="w-8 h-8 text-[#CCFF00]" />
-  }
-];
-
-export const expertise: ExpertiseItem[] = [
-  {
-    title: "Frontend Engineering",
-    content: "We push the boundaries of the browser. Using React, Vite, Next.js, and WebGL, we build buttery-smooth, award-winning interfaces that captivate users and drive engagement."
-  },
-  {
-    title: "Backend Architecture",
-    content: "Rock-solid, scalable systems. We design APIs and microservices using Java, Node.js, Go, and PostgreSQL that can handle millions of requests without breaking a sweat."
-  },
-  {
-    title: "Cloud Infrastructure",
-    content: "Zero-downtime deployments. We utilize AWS, Docker, and Kubernetes to ensure your application is secure, incredibly fast, and always online."
+    desc: 'Zero-downtime deployment. We ensure your application is secure, incredibly fast, SEO-optimized, and ready to handle massive amounts of traffic.'
   }
 ];
 
 export const team: TeamMember[] = [
-  { id: 1, name: 'Akshar ', role: 'Lead Software Developer', github: 'https://github.com/aksharkh', linkedin: 'https://www.linkedin.com/in/akshar-k-h-1b404521b/', image: akshar },
-  { id: 2, name: 'Abhinav ', role: 'Software Engineer', github: 'https://github.com/abhinavrbharadwaj7', linkedin: 'https://www.linkedin.com/in/abhinavrbharadwaj/', image: abhinav },
-  { id: 3, name: 'Adnaan ', role: 'FullStack Developer', github: 'https://github.com/Khan012003', linkedin: 'https://www.linkedin.com/in/adnaan-khan-153042319/', image: adnaan },
+  { id: 1, name: 'Akshar', role: 'Lead Software Developer', github: 'https://github.com/aksharkh', linkedin: 'https://www.linkedin.com/in/akshar-k-h-1b404521b/', image: akshar },
+  { id: 2, name: 'Abhinav', role: 'Software Engineer', github: 'https://github.com/abhinavrbharadwaj7', linkedin: 'https://www.linkedin.com/in/abhinavrbharadwaj/', image: abhinav },
+  { id: 3, name: 'Adnaan', role: 'FullStack Developer', github: 'https://github.com/Khan012003', linkedin: 'https://www.linkedin.com/in/adnaan-khan-153042319/', image: adnaan },
   { id: 4, name: 'Bhuvan', role: 'Java FullStack Developer', github: 'https://github.com/AKlRA', linkedin: 'https://www.linkedin.com/in/bhuvan-mh-0144492a8/', image: bhuvan },
-  // { id: 4, name: 'Chandan', role: 'Lead Cyber Security Engineer', github: 'https://github.com/chandantm2002', linkedin: 'https://www.linkedin.com/in/chandan-t-m-691851235/', image: chandan },
-
 ];
 
 export const pricingPlans: PricingPlan[] = [

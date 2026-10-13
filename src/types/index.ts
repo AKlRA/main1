@@ -1,13 +1,9 @@
-
-import React from 'react';
-
 export interface Project {
   id: number;
   title: string;
   category: string;
   image: string;
-  aspect: string;
-  col: string;
+  srcSet: string;
   link: string;
   tags: string[];
 }
@@ -16,12 +12,6 @@ export interface ProcessStep {
   id: string;
   title: string;
   desc: string;
-  icon: React.ReactNode;
-}
-
-export interface ExpertiseItem {
-  title: string;
-  content: string;
 }
 
 export interface TeamMember {
@@ -31,13 +21,6 @@ export interface TeamMember {
   github: string;
   linkedin: string;
   image: string;
-}
-
-export interface AccordionProps {
-  title: string;
-  content: string;
-  isOpen: boolean;
-  onClick: () => void;
 }
 
 export interface PricingPlan {

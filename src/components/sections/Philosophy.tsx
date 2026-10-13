@@ -1,65 +1,59 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import ScrollRevealText from '../ui/ScrollRevealText';
+import { useRef } from 'react';
+import { gsap, SplitText, useGSAP } from '../../motion/gsap';
+import { MQ } from '../../motion/tokens';
 
-const Philosophy: React.FC = () => {
+const STATEMENT =
+  'We refuse to build ordinary digital experiences. Our obsession with detail, motion physics, and uncompromising performance transforms ambitious brands into industry icons.';
+
+/** Words light up in reading order as the section is scrubbed; the outline word drifts behind. */
+export default function Philosophy() {
+  const root = useRef<HTMLElement>(null);
+  const text = useRef<HTMLParagraphElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      const build = (pin: boolean) => {
+        const split = SplitText.create(text.current!, { type: 'words', aria: 'none' });
+        const tl = gsap.timeline({
+          defaults: { ease: 'none' },
+          scrollTrigger: pin
+            ? { trigger: root.current, start: 'top top', end: '+=120%', pin: true, scrub: 0.6 }
+            : { trigger: text.current, start: 'top 80%', end: 'bottom 45%', scrub: 0.6 },
+        });
+        tl.fromTo(split.words, { opacity: 0.24 }, { opacity: 1, stagger: 0.1, duration: 0.4 }, 0)
+          .fromTo('.philo-outline', { xPercent: 6 }, { xPercent: -14, duration: tl.duration() || 1 }, 0);
+        return () => split.revert();
+      };
+      mm.add(MQ.desktop, () => build(true));
+      mm.add(MQ.mobile, () => build(false));
+      return () => mm.revert();
+    },
+    { scope: root },
+  );
+
   return (
-    <section className="py-28 md:py-56 px-6 md:px-12 relative z-10 bg-[#030008] overflow-hidden border-y border-white/5">
-
-      {/* Premium Dot Matrix Backdrop Grid */}
-      <div 
-        className="absolute inset-0 z-0 opacity-[0.18] pointer-events-none" 
-        style={{ 
-          backgroundImage: 'radial-gradient(#CCFF00 1.2px, transparent 1.2px)', 
-          backgroundSize: '32px 32px' 
-        }}
-      ></div>
-
-      {/* Dual Floating Ambient Glow Orbs for Space Nebula Depth */}
-      <motion.div 
-        animate={{
-          x: [0, 60, -60, 0],
-          y: [0, -50, 50, 0],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="absolute left-10 md:left-1/4 top-1/4 w-[280px] md:w-[350px] h-[280px] md:h-[350px] rounded-full bg-[#CCFF00] opacity-[0.07] filter blur-[120px] pointer-events-none z-0"
-      />
-      <motion.div 
-        animate={{
-          x: [0, -70, 70, 0],
-          y: [0, 60, -60, 0],
-        }}
-        transition={{
-          duration: 25,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="absolute right-10 md:right-1/4 bottom-1/4 w-[300px] md:w-[400px] h-[300px] md:h-[400px] rounded-full bg-[#00F0FF] opacity-[0.05] filter blur-[130px] pointer-events-none z-0"
-      />
-
-      {/* Giant Outline Background Typography */}
-      <div className="flex justify-center items-center  select-none pointer-events-none opacity-50 z-0 font-sans font-black uppercase text-[12vw] leading-none tracking-tighter text-transparent" style={{ WebkitTextStroke: '1px white' }}>
-        PHILOSOPHY
+    <section
+      ref={root}
+      id="philosophy"
+      data-chrome="light"
+      aria-label="Philosophy"
+      className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden bg-ink py-28"
+    >
+      <span
+        aria-hidden
+        className="philo-outline pointer-events-none absolute left-0 top-[8%] select-none whitespace-nowrap font-display text-[24vw] font-bold leading-none tracking-[-0.06em] text-transparent [-webkit-text-stroke:1px_rgba(255,255,255,0.13)] md:top-[4%]"
+      >
+        Philosophy
+      </span>
+      <div className="container-x relative">
+        <p
+          ref={text}
+          className="max-w-[22ch] font-display text-[clamp(2.1rem,5vw,5.25rem)] font-semibold leading-[1.02] tracking-[-0.035em] md:ml-[8vw]"
+        >
+          {STATEMENT}
+        </p>
       </div>
-
-      <div className="max-w-5xl mx-auto flex justify-center relative z-10 px-6 md:px-12 mt-12">
-        <div className="max-w-5xl text-center md:text-left">
-          {/* Section Indicator */}
-          <div className="flex items-center gap-3 mb-8 justify-center md:justify-start">
-            <span className="w-2.5 h-2.5 bg-[#CCFF00] rounded-full shadow-[0_0_10px_#CCFF00]"></span>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#CCFF00]">AXORAA STATEMENT</span>
-          </div>
-
-          <ScrollRevealText text="We refuse to build ordinary digital experiences. Our obsession with detail, motion physics, and uncompromising performance transforms ambitious brands into industry icons." />
-        </div>
-      </div>
-
     </section>
   );
-};
-
-export default Philosophy;
+}

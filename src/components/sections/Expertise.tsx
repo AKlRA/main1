@@ -1,373 +1,237 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Terminal, Database, Cpu, Layers } from 'lucide-react';
-import ScrambleText from '../ui/ScrambleText';
-import { premiumEase } from '../../lib/utils';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Cpu, Database, StackSimple } from '@phosphor-icons/react';
+import { gsap, useGSAP } from '../../motion/gsap';
+import { MQ } from '../../motion/tokens';
+import { useInView } from '../../hooks/useInView';
+import SplitReveal from '../ui/SplitReveal';
 
-export const Expertise: React.FC = () => {
-  // Frontend Card state
-  const [rotate, setRotate] = useState({ x: 15, y: -15 });
-  const [isHoveredFrontend, setIsHoveredFrontend] = useState(false);
-  const [autoRotate, setAutoRotate] = useState({ x: 15, y: -15 });
+const card = 'xp-card relative flex flex-col overflow-hidden rounded-[1.5rem] bg-white/[0.03] p-7 ring-1 ring-white/10 md:p-9';
+const action =
+  'pressable min-h-11 flex-1 rounded-full text-sm font-medium text-white/80 ring-1 ring-white/12 transition-colors duration-200 hover:bg-lime hover:text-ink hover:ring-lime disabled:pointer-events-none disabled:opacity-50';
 
-  // 1. Auto-rotation loop for Frontend 3D Sandbox
-  useEffect(() => {
-    if (isHoveredFrontend) return;
-    let frame: number;
-    const start = performance.now();
-    const animate = (time: number) => {
-      const elapsed = time - start;
-      const angleX = 15 + Math.sin(elapsed * 0.001) * 20;
-      const angleY = -15 + Math.cos(elapsed * 0.001) * 25;
-      setAutoRotate({ x: angleX, y: angleY });
-      frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [isHoveredFrontend]);
-  
-  const handleFrontendMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setRotate({
-      x: -(y / (rect.height / 2)) * 40,
-      y: (x / (rect.width / 2)) * 40,
-    });
-  };
+function CardHead({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 place-items-center rounded-full bg-lime/10 text-lime">{icon}</span>
+        <h3 className="text-display text-2xl md:text-3xl">{title}</h3>
+      </div>
+      <p className="mt-4 max-w-[46ch] text-base leading-relaxed text-white/65">{children}</p>
+    </>
+  );
+}
 
-  const handleFrontendMouseLeave = () => {
-    setIsHoveredFrontend(false);
-    setRotate({ x: 15, y: -15 });
-  };
+/** A wireframe cube that idles on its own and leans toward the pointer. */
+function Cube() {
+  const stage = useRef<HTMLDivElement>(null);
+  const tilt = useRef<HTMLDivElement>(null);
+  const spin = useRef<HTMLDivElement>(null);
 
-  // Backend Card state
+  useGSAP(
+    () => {
+      gsap.set(tilt.current, { rotationX: -18, rotationY: 24 });
+      const mm = gsap.matchMedia();
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.to(spin.current, { rotationY: 360, duration: 28, ease: 'none', repeat: -1 });
+      });
+      mm.add(`${MQ.finePointer} and (prefers-reduced-motion: no-preference)`, () => {
+        const el = stage.current!;
+        const rx = gsap.quickTo(tilt.current, 'rotationX', { duration: 0.8, ease: 'ax.out' });
+        const ry = gsap.quickTo(tilt.current, 'rotationY', { duration: 0.8, ease: 'ax.out' });
+        const move = (e: PointerEvent) => {
+          const b = el.getBoundingClientRect();
+          rx(-18 - ((e.clientY - b.top) / b.height - 0.5) * 50);
+          ry(24 + ((e.clientX - b.left) / b.width - 0.5) * 70);
+        };
+        const leave = () => { rx(-18); ry(24); };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerleave', leave);
+        return () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerleave', leave); };
+      });
+      return () => mm.revert();
+    },
+    { scope: stage },
+  );
+
+  const faces = ['rotateY(0deg)', 'rotateY(180deg)', 'rotateY(90deg)', 'rotateY(-90deg)', 'rotateX(90deg)', 'rotateX(-90deg)'];
+  return (
+    <div ref={stage} data-cursor="drag" data-cursor-label="Tilt" className="relative mt-8 grid flex-1 place-items-center rounded-[1.1rem] bg-ink/60 py-14 ring-1 ring-white/8 [perspective:700px]">
+      <div aria-hidden className="absolute inset-0 rounded-[inherit] bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:24px_24px]" />
+      <div ref={tilt} className="relative size-32 [--half:4rem] [transform-style:preserve-3d] md:size-52 md:[--half:6.5rem]">
+        <div ref={spin} className="absolute inset-0 [transform-style:preserve-3d]">
+          {faces.map((f) => (
+            <div key={f} className="absolute inset-0 border border-lime/50 bg-lime/[0.04]" style={{ transform: `${f} translateZ(var(--half))` }} />
+          ))}
+          <div className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-lime shadow-[0_0_24px_rgba(204,255,0,0.7)]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const IDLE_LOGS = [
+  'HEALTH: cluster status 100% healthy',
+  'METRICS: CPU 12% | RAM 29% | disk 15%',
+  'SYNC: cron-sync completed, 0 mutations',
+  'API: GET /api/v1/health 200 OK 2.8ms',
+  'CACHE: recompiling cache metrics, ready',
+  'DB: transaction logs rotated',
+  'AUDIT: Redis cache hit ratio 99.8%',
+];
+
+const stamp = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
+
+function Console() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
   const [logs, setLogs] = useState<string[]>([
-    "Sys initialized. Node cluster online.",
-    "DB connection established (primary).",
-    "API gateway listening on port 8080."
+    'Sys initialised. Node cluster online.',
+    'DB connection established (primary).',
+    'API gateway listening on port 8080.',
   ]);
-  const [isPinging, setIsPinging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const timers = useRef<number[]>([]);
+  const add = useCallback((msg: string) => setLogs((l) => [...l.slice(-5), `[${stamp()}] ${msg}`]), []);
+  const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
 
-  const addLog = (msg: string) => {
-    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-    setLogs((prev) => [...prev.slice(-5), `[${time}] ${msg}`]);
-  };
-
-  // 2. Auto-log metrics effect for Backend Console
   useEffect(() => {
-    const activities = [
-      "HEALTH: Cluster status: 100% healthy",
-      "METRICS: CPU: 12% | RAM: 29% | Disk: 15%",
-      "SYNC: cron-sync completed - 0 mutations",
-      "API: GET /api/v1/health - 200 OK - 2.8ms",
-      "CACHE: Recompiling cache metrics... Ready",
-      "DB: Transaction logs rotated successfully",
-      "AUDIT: Redis Cache hit ratio: 99.8%"
-    ];
-    const interval = setInterval(() => {
-      const randomMsg = activities[Math.floor(Math.random() * activities.length)];
-      addLog(randomMsg);
-    }, 4500);
-    return () => clearInterval(interval);
-  }, []);
+    if (!inView) return;
+    const id = window.setInterval(() => add(IDLE_LOGS[Math.floor(Math.random() * IDLE_LOGS.length)]), 4500);
+    return () => window.clearInterval(id);
+  }, [inView, add]);
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
 
-  const triggerApi = () => {
-    if (isPinging) return;
-    setIsPinging(true);
-    addLog("PING -> GET /api/v1/metrics");
-    setTimeout(() => {
-      addLog("DB QUERY: SELECT SUM(value) FROM ledger - 2.1ms");
-    }, 200);
-    setTimeout(() => {
-      addLog("REDIS: Cache hit for ledger_sum");
-    }, 450);
-    setTimeout(() => {
-      addLog("RESPONSE: 200 OK - Latency: 4ms");
-      setIsPinging(false);
-    }, 700);
+  const ping = () => {
+    setBusy(true);
+    add('PING -> GET /api/v1/metrics');
+    later(200, () => add('DB QUERY: SELECT SUM(value) FROM ledger 2.1ms'));
+    later(450, () => add('REDIS: cache hit for ledger_sum'));
+    later(700, () => { add('RESPONSE: 200 OK, latency 4ms'); setBusy(false); });
   };
-
-  const triggerDbHeavy = () => {
-    addLog("WARNING: Running database diagnostic audit...");
-    setTimeout(() => {
-      addLog("DB: Compacting transaction shards... Done.");
-      addLog("DB: Rebuilding indices... Done.");
-      addLog("AUDIT: 0 leaks. Cache hit ratio 99.8%.");
-    }, 400);
+  const diagnose = () => {
+    add('DB: running diagnostic audit');
+    later(400, () => { add('DB: shards compacted, indices rebuilt'); add('AUDIT: 0 leaks found'); });
   };
-
-  // Cloud Card state
-  const [trafficActive, setTrafficActive] = useState(false);
-
-  const simulateTraffic = () => {
-    if (trafficActive) return;
-    setTrafficActive(true);
-    setTimeout(() => setTrafficActive(false), 2500);
-  };
-
-  // 3. Auto-traffic effect for Cloud Infrastructure
-  useEffect(() => {
-    simulateTraffic();
-    const interval = setInterval(() => {
-      simulateTraffic();
-    }, 6500);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
-    <section id="expertise" className="py-24 md:py-48 px-6 md:px-12 relative z-10 bg-[#020202] text-white overflow-hidden border-b border-white/5">
-      {/* Rotating Tech Radar Backdrop */}
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
-        className="absolute -right-40 -top-40 w-[600px] h-[600px] opacity-[0.03] text-[#CCFF00] pointer-events-none z-0 select-none"
-      >
-        <svg viewBox="0 0 200 200" fill="none" stroke="currentColor" strokeWidth="0.5" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="100" cy="100" r="90" strokeDasharray="2 4" />
-          <circle cx="100" cy="100" r="70" />
-          <circle cx="100" cy="100" r="50" strokeDasharray="4 2" />
-          <circle cx="100" cy="100" r="30" />
-          <line x1="10" y1="100" x2="190" y2="100" strokeDasharray="1 3" />
-          <line x1="100" y1="10" x2="100" y2="190" strokeDasharray="1 3" />
-          <line x1="36.36" y1="36.36" x2="163.64" y2="163.64" />
-          <line x1="36.36" y1="163.64" x2="163.64" y2="36.36" />
-        </svg>
-      </motion.div>
+    <div ref={ref} className="mt-7 flex flex-1 flex-col gap-4 rounded-[1.1rem] bg-ink/60 p-4 ring-1 ring-white/8">
+      <ol aria-live="polite" className="flex min-h-40 flex-1 flex-col justify-end gap-1 overflow-hidden font-mono text-[0.7rem] leading-relaxed text-white/60">
+        {logs.map((log, i) => (
+          <li key={`${i}-${log}`} className={log.includes('PING') || log.includes('RESPONSE') ? 'text-lime' : undefined}>{log}</li>
+        ))}
+      </ol>
+      <div className="flex gap-2">
+        <button type="button" onClick={ping} disabled={busy} className={action}>Ping API</button>
+        <button type="button" onClick={diagnose} className={action}>DB diagnostic</button>
+      </div>
+    </div>
+  );
+}
 
-      {/* Dot matrix grid backdrop */}
-      <div 
-        className="absolute inset-0 z-0 opacity-[0.18] pointer-events-none" 
-        style={{ 
-          backgroundImage: 'radial-gradient(#CCFF00 1.2px, transparent 1.2px)', 
-          backgroundSize: '36px 36px' 
-        }}
-      ></div>
+function Topology() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const [wave, setWave] = useState(false);
+  const fire = useCallback(() => {
+    setWave(true);
+    window.setTimeout(() => setWave(false), 2500);
+  }, []);
 
-      <div className="max-w-[1400px] mx-auto relative z-10 px-6 md:px-12">
-        
-        {/* Section Header */}
-        <div className="mb-20 text-left">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="w-2.5 h-2.5 bg-[#CCFF00] rounded-full shadow-[0_0_10px_#CCFF00]"></span>
-            <span className="font-mono text-xs uppercase tracking-widest text-[#CCFF00]">CAPABILITIES</span>
-          </div>
+  useEffect(() => {
+    if (!inView) return;
+    const first = window.setTimeout(fire, 400);
+    const id = window.setInterval(fire, 6500);
+    return () => { window.clearTimeout(first); window.clearInterval(id); };
+  }, [inView, fire]);
 
-          <h2 className="text-5xl md:text-7xl font-bold tracking-tighter uppercase mb-6">
-            Engineering <span className="font-serif italic text-transparent" style={{ WebkitTextStroke: '2px #CCFF00' }}>Expertise</span>
-          </h2>
-          
-          <p className="text-xl text-gray-400 font-light max-w-2xl">
-            We don't build generic websites. We engineer high-performance systems, custom browser experiences, and automated cloud architectures.
-          </p>
-        </div>
+  const node = (x: number, y: number, label: string, r = 11) => (
+    <g key={label}>
+      <circle cx={x} cy={y} r={r} fill="#0a0a0a" stroke={wave ? '#ccff00' : 'rgba(255,255,255,0.3)'} strokeWidth="1.4" className="transition-[stroke] duration-300" />
+      <text x={x} y={y + 3} fill={label === 'LB' ? '#ccff00' : '#fff'} fontSize="8" fontWeight="600" textAnchor="middle">{label}</text>
+    </g>
+  );
 
-        {/* 3-Column Interactive Sandbox Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-          
-          {/* Card 1: Frontend Engineering */}
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: premiumEase }}
-            className="flex flex-col rounded-3xl border border-white/10 bg-zinc-950/40 p-8 hover:border-[#CCFF00]/20 transition-colors duration-500 h-full group"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[#CCFF00] group-hover:bg-[#CCFF00]/10 transition-colors">
-                <Cpu size={24} />
-              </div>
-              <h3 className="text-2xl font-bold uppercase tracking-tight"><ScrambleText text="Frontend" /></h3>
-            </div>
+  return (
+    <div ref={ref} className="mt-7 flex flex-1 flex-col gap-4 rounded-[1.1rem] bg-ink/60 p-4 ring-1 ring-white/8">
+      <div className="flex items-center justify-between text-xs text-white/50">
+        <span>Autoscale</span>
+        <span className="tabular text-white/80">{wave ? '2 nodes' : '1 node'}</span>
+      </div>
+      <svg viewBox="0 0 240 140" className="w-full flex-1">
+        {[[30, 70, 90, 70], [90, 70, 150, 35], [90, 70, 150, 105], [150, 35, 210, 70], [150, 105, 210, 70]].map(([a, b, c, d]) => (
+          <line key={`${a}${b}${c}${d}`} x1={a} y1={b} x2={c} y2={d} stroke="rgba(255,255,255,0.1)" strokeWidth="1.4" />
+        ))}
+        {wave && (
+          <>
+            <path d="M30 70 L90 70 L150 35 L210 70" fill="none" stroke="#ccff00" strokeWidth="2" className="traffic" />
+            <path d="M30 70 L90 70 L150 105 L210 70" fill="none" stroke="#ccff00" strokeWidth="2" className="traffic" />
+          </>
+        )}
+        {node(30, 70, 'C', 10)}
+        {node(90, 70, 'LB', 12)}
+        {node(150, 35, 'N1', 10)}
+        {node(150, 105, 'N2', 10)}
+        {node(210, 70, 'DB', 10)}
+      </svg>
+      <button type="button" onClick={fire} disabled={wave} className={`${action} flex-none`}>
+        {wave ? 'Routing traffic' : 'Fire a traffic wave'}
+      </button>
+    </div>
+  );
+}
 
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
+export default function Expertise() {
+  const root = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.from('.xp-card', {
+          y: 60,
+          opacity: 0,
+          duration: 1,
+          ease: 'ax.out',
+          stagger: 0.08,
+          scrollTrigger: { trigger: '.xp-grid', start: 'top 80%', once: true },
+        });
+      });
+      return () => mm.revert();
+    },
+    { scope: root },
+  );
+
+  return (
+    <section ref={root} id="expertise" data-chrome="light" className="relative bg-ink py-24 md:py-40">
+      <div className="container-x">
+        <SplitReveal as="h2" by="words" className="text-display max-w-[12ch] text-[clamp(3.25rem,8vw,8rem)]">
+          Engineering expertise
+        </SplitReveal>
+        <SplitReveal as="p" className="mt-8 max-w-[52ch] text-lg leading-relaxed text-white/65 md:text-xl">
+          We don&apos;t build generic websites. We engineer high-performance systems, custom browser experiences, and automated cloud architectures.
+        </SplitReveal>
+
+        <div className="xp-grid mt-14 grid gap-4 md:mt-20 md:grid-cols-12 md:gap-5">
+          <article className={`${card} bg-[radial-gradient(90%_70%_at_80%_100%,rgba(204,255,0,0.09),transparent_70%)] md:col-span-7 md:row-span-2`}>
+            <CardHead icon={<Cpu size={20} weight="duotone" />} title="Frontend">
               We push browser limits. Using React, Vite, and custom shaders, we build buttery-smooth, interactive interfaces.
-            </p>
-
-            {/* Interactive Sandbox: CSS 3D Rotate Cube */}
-            <div 
-              onMouseEnter={() => setIsHoveredFrontend(true)}
-              onMouseMove={handleFrontendMouseMove}
-              onMouseLeave={handleFrontendMouseLeave}
-              className="mt-auto aspect-square rounded-2xl bg-black border border-white/5 flex flex-col items-center justify-center relative overflow-hidden p-6 cursor-grab active:cursor-grabbing shadow-inner group-hover:border-white/10 transition-colors"
-            >
-              {/* Grid backdrop */}
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-              
-              {/* Monospace coordinates HUD */}
-              <div className="absolute top-3 left-4 font-mono text-[9px] text-gray-500 uppercase tracking-widest pointer-events-none">
-                3D_ROTATE: RX:{Math.round(isHoveredFrontend ? rotate.x : autoRotate.x)}° RY:{Math.round(isHoveredFrontend ? rotate.y : autoRotate.y)}°
-              </div>
-              <div className="absolute bottom-3 left-4 font-mono text-[9px] text-[#CCFF00] uppercase tracking-widest pointer-events-none animate-pulse">
-                {isHoveredFrontend ? "Manual_Override" : "Auto_Rotate_Active"}
-              </div>
-
-              {/* 3D Container */}
-              <div className="perspective-[400px] w-24 h-24 flex items-center justify-center">
-                <div 
-                  className="w-20 h-20 relative transition-transform duration-200" 
-                  style={{ 
-                    transformStyle: 'preserve-3d',
-                    transform: `rotateX(${isHoveredFrontend ? rotate.x : autoRotate.x}deg) rotateY(${isHoveredFrontend ? rotate.y : autoRotate.y}deg)`
-                  }}
-                >
-                  {/* Cube Faces */}
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'translateZ(40px)' }} />
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'rotateY(180deg) translateZ(40px)' }} />
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'rotateY(90deg) translateZ(40px)' }} />
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'rotateY(-90deg) translateZ(40px)' }} />
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'rotateX(90deg) translateZ(40px)' }} />
-                  <div className="absolute inset-0 border border-[#CCFF00]/30 bg-[#CCFF00]/5" style={{ transform: 'rotateX(-90deg) translateZ(40px)' }} />
-                  
-                  {/* Inner glowing sphere node */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#CCFF00] shadow-[0_0_15px_#CCFF00]" style={{ transform: 'translateZ(0px)' }} />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Card 2: Backend Architecture */}
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.1, ease: premiumEase }}
-            className="flex flex-col rounded-3xl border border-white/10 bg-zinc-950/40 p-8 hover:border-[#CCFF00]/20 transition-colors duration-500 h-full group"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[#CCFF00] group-hover:bg-[#CCFF00]/10 transition-colors">
-                <Database size={24} />
-              </div>
-              <h3 className="text-2xl font-bold uppercase tracking-tight"><ScrambleText text="Backend" /></h3>
-            </div>
-
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
-              High-throughput systems. We write clean, optimized microservices using Java and Node.js that handle massive traffic effortlessly.
-            </p>
-
-            {/* Interactive Sandbox: Mock Log Terminal */}
-            <div className="mt-auto aspect-square rounded-2xl bg-black border border-white/5 flex flex-col p-4 font-mono text-[10px] relative overflow-hidden group-hover:border-white/10 transition-colors">
-              {/* Terminal Title Bar */}
-              <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
-                <div className="flex gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500/80"></span>
-                  <span className="w-2 h-2 rounded-full bg-yellow-500/80"></span>
-                  <span className="w-2 h-2 rounded-full bg-green-500/80"></span>
-                </div>
-                <div className="text-[8px] text-gray-500 uppercase tracking-widest flex items-center gap-1">
-                  <Terminal size={10} /> console.sh
-                </div>
-              </div>
-
-              {/* Terminal Logs Output */}
-              <div className="flex-1 flex flex-col gap-1 text-gray-400 select-all overflow-y-auto mb-4">
-                {logs.map((log, i) => (
-                  <div key={i} className={log.includes("PING") ? "text-[#CCFF00]" : log.includes("WARNING") ? "text-yellow-400" : "text-zinc-400"}>
-                    {log}
-                  </div>
-                ))}
-              </div>
-
-              {/* Interactive buttons row */}
-              <div className="flex gap-2">
-                <button 
-                  onClick={triggerApi}
-                  disabled={isPinging}
-                  className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-[#CCFF00] hover:text-black hover:border-[#CCFF00] text-[9px] font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50"
-                >
-                  Ping API
-                </button>
-                <button 
-                  onClick={triggerDbHeavy}
-                  className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-[#CCFF00] hover:text-black hover:border-[#CCFF00] text-[9px] font-bold uppercase tracking-wider text-white transition-all"
-                >
-                  DB Diagnostic
-                </button>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Card 3: Cloud Infrastructure */}
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.2, ease: premiumEase }}
-            className="flex flex-col rounded-3xl border border-white/10 bg-zinc-950/40 p-8 hover:border-[#CCFF00]/20 transition-colors duration-500 h-full group"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[#CCFF00] group-hover:bg-[#CCFF00]/10 transition-colors">
-                <Layers size={24} />
-              </div>
-              <h3 className="text-2xl font-bold uppercase tracking-tight"><ScrambleText text="Infrastructure" /></h3>
-            </div>
-
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
+            </CardHead>
+            <Cube />
+          </article>
+          <article className={`${card} md:col-span-5`}>
+            <CardHead icon={<Database size={20} weight="duotone" />} title="Backend">
+              High-throughput systems. We write clean, optimised microservices using Java and Node.js that handle massive traffic effortlessly.
+            </CardHead>
+            <Console />
+          </article>
+          <article className={`${card} md:col-span-5`}>
+            <CardHead icon={<StackSimple size={20} weight="duotone" />} title="Infrastructure">
               Zero-downtime, self-healing deployments. We leverage AWS, Docker, and CDNs for secure, blazing-fast hosting.
-            </p>
-
-            {/* Interactive Sandbox: Server Network Topology Node Graph */}
-            <div className="mt-auto aspect-square rounded-2xl bg-black border border-white/5 flex flex-col p-4 relative overflow-hidden group-hover:border-white/10 transition-colors justify-between">
-              
-              {/* Canvas Visual SVG */}
-              <div className="w-full flex-1 flex items-center justify-center min-h-[140px] relative">
-                <svg viewBox="0 0 240 140" className="w-full h-full">
-                  {/* Connection lines */}
-                  <line x1="30" y1="70" x2="90" y2="70" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-                  <line x1="90" y1="70" x2="150" y2="35" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-                  <line x1="90" y1="70" x2="150" y2="105" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-                  <line x1="150" y1="35" x2="210" y2="70" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-                  <line x1="150" y1="105" x2="210" y2="70" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-
-                  {/* Pulsing traffic overlays */}
-                  {trafficActive && (
-                    <>
-                      <path d="M 30 70 L 90 70 L 150 35 L 210 70" fill="none" stroke="#CCFF00" strokeWidth="2" strokeDasharray="10 15" className="cloud-traffic-path" />
-                      <path d="M 30 70 L 90 70 L 150 105 L 210 70" fill="none" stroke="#CCFF00" strokeWidth="2" strokeDasharray="10 15" className="cloud-traffic-path" />
-                    </>
-                  )}
-
-                  {/* Nodes */}
-                  {/* Client */}
-                  <circle cx="30" cy="70" r="10" fill="black" stroke="rgba(255,255,255,0.2)" strokeWidth="2" className="hover:stroke-[#CCFF00] hover:r-12 transition-all cursor-pointer" />
-                  <text x="30" y="73" fill="white" fontSize="8" textAnchor="middle" fontWeight="bold">C</text>
-                  
-                  {/* Load Balancer */}
-                  <circle cx="90" cy="70" r="12" fill="black" stroke="rgba(255,255,255,0.2)" strokeWidth="2" className="hover:stroke-[#CCFF00] transition-all cursor-pointer" />
-                  <text x="90" y="73" fill="#CCFF00" fontSize="8" textAnchor="middle" fontWeight="bold">LB</text>
-                  
-                  {/* Web Nodes */}
-                  <circle cx="150" cy="35" r="10" fill="black" stroke="rgba(255,255,255,0.2)" strokeWidth="2" className="hover:stroke-[#CCFF00] transition-all cursor-pointer" />
-                  <text x="150" y="38" fill="white" fontSize="8" textAnchor="middle">N1</text>
-                  
-                  {/* Web Node 2 */}
-                  <circle cx="150" cy="105" r="10" fill="black" stroke="rgba(255,255,255,0.2)" strokeWidth="2" className="hover:stroke-[#CCFF00] transition-all cursor-pointer" />
-                  <text x="150" y="108" fill="white" fontSize="8" textAnchor="middle">N2</text>
-                  
-                  {/* Database */}
-                  <circle cx="210" cy="70" r="10" fill="black" stroke="rgba(255,255,255,0.2)" strokeWidth="2" className="hover:stroke-[#CCFF00] transition-all cursor-pointer" />
-                  <text x="210" y="73" fill="white" fontSize="8" textAnchor="middle">DB</text>
-                </svg>
-                <div className="absolute top-0 right-0 font-mono text-[8px] text-gray-500 uppercase tracking-widest">
-                  Auto_Scale: {trafficActive ? "2_NODES" : "1_NODE"}
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <button 
-                onClick={simulateTraffic}
-                disabled={trafficActive}
-                className="w-full py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-[#CCFF00] hover:text-black hover:border-[#CCFF00] text-[9px] font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50"
-              >
-                {trafficActive ? "Simulating Traffic..." : "Fire Traffic Wave"}
-              </button>
-            </div>
-          </motion.div>
-
+            </CardHead>
+            <Topology />
+          </article>
         </div>
       </div>
     </section>
   );
-};
-
-export default Expertise;
+}

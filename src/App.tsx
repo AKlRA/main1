@@ -1,184 +1,129 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import Preloader from './components/ui/Preloader';
-import CustomCursor from './components/ui/CustomCursor';
-import GlowOrb from './components/ui/GlowOrb';
-import MobileWarning from './components/ui/MobileWarning';
-import CinematicNoise from './components/ui/CinematicNoise';
-import ScrollProgress from './components/ui/ScrollProgress';
-import ContactWidget from './components/ui/ContactWidget';
-import Navbar from './components/layout/Navbar';
-import Home from './pages/Home';
-import TeamPage from './pages/TeamPage';
-import PricingPage from './pages/PricingPage';
-import Footer from './components/layout/Footer';
-
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { SpeedInsights } from '@vercel/speed-insights/react';
+import { ScrollTrigger } from './motion/gsap';
+import { useScrollApi } from './motion/scrollContext';
+import Preloader from './components/chrome/Preloader';
+import Bezel from './components/chrome/Bezel';
+import Cursor from './components/chrome/Cursor';
+import FloatingQuote from './components/chrome/FloatingQuote';
+import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
+import QuoteModal from './components/ui/QuoteModal';
+import Home from './pages/Home';
 
-function App() {
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const hasRun = sessionStorage.getItem('preloader-run');
-      if (hasRun) return false;
-    }
-    return true;
-  });
-  const [preloaderUnmounted, setPreloaderUnmounted] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const hasRun = sessionStorage.getItem('preloader-run');
-      if (hasRun) return true;
-    }
+const loadTeam = () => import('./pages/TeamPage');
+const loadPricing = () => import('./pages/PricingPage');
+const TeamPage = lazy(loadTeam);
+const PricingPage = lazy(loadPricing);
+import { IntroContext } from './motion/intro';
+
+const SEEN_KEY = 'axoraa-intro-seen';
+
+function readSeen() {
+  try {
+    return sessionStorage.getItem(SEEN_KEY) === '1';
+  } catch {
     return false;
-  });
-  const { pathname, hash } = useLocation();
+  }
+}
 
-  // Memoize preloader completion to prevent inline function recreation causing preloader resets on mousemove
-  const handlePreloaderComplete = useCallback(() => {
-    setLoading(false);
-    sessionStorage.setItem('preloader-run', 'true');
+export default function App() {
+  const [showPreloader, setShowPreloader] = useState(() => !readSeen());
+  // `revealed` flips as the preloader starts lifting, so the hero can choreograph its entrance under it.
+  const [revealed, setRevealed] = useState(() => readSeen());
+  const { pathname, hash } = useLocation();
+  const { scrollTo, lock, unlock } = useScrollApi();
+  const navType = useNavigationType();
+
+  useEffect(() => {
+    if (!showPreloader) return;
+    lock();
+    return unlock;
+  }, [showPreloader, lock, unlock]);
+
+  const handleReveal = useCallback(() => setRevealed(true), []);
+  const handleDone = useCallback(() => {
+    try {
+      sessionStorage.setItem(SEEN_KEY, '1');
+    } catch {
+      /* private mode: the intro simply plays again next visit */
+    }
+    setShowPreloader(false);
   }, []);
 
-  // Scroll to hash or top on route change
+  // Deep links (/#work) land on their section once the page has laid out.
   useEffect(() => {
-    if (hash) {
-      const id = hash.replace('#', '');
-      const timer = setTimeout(() => {
-        const element = document.getElementById(id);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 150);
-      return () => clearTimeout(timer);
-    } else {
-      window.scrollTo(0, 0);
-    }
-  }, [pathname, hash]);
-  
-  // Screen bezel color tracking (matches navbar)
-  const [isDarkBg, setIsDarkBg] = useState(true);
+    if (!revealed || !hash) return;
+    const jump = () => { ScrollTrigger.refresh(); scrollTo(hash, { offset: -24, immediate: true }); };
+    // Twice: once early, once after pins, split text and images have settled.
+    const timers = [window.setTimeout(jump, 120), window.setTimeout(jump, 700)];
+    return () => timers.forEach(window.clearTimeout);
+    // Only on first reveal; in-app hash navigation goes through the page transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed]);
 
+  // Back / forward skip the curtain; start the restored page at the top.
   useEffect(() => {
-    const checkBg = () => {
-      // Footer Section (#contact) should be black (on all pages)
-      const contactSection = document.getElementById('contact');
-      if (contactSection) {
-        const rect = contactSection.getBoundingClientRect();
-        if (rect.top <= 60) {
-          setIsDarkBg(false);
-          return;
-        }
-      }
-
-      if (pathname === '/team' || pathname === '/pricing') {
-        setIsDarkBg(true);
-        return;
-      }
-      if (window.scrollY < 300) {
-        setIsDarkBg(false);
-        return;
-      }
-      
-      const workSection = document.getElementById('work');
-      if (workSection) {
-        const rect = workSection.getBoundingClientRect();
-        if (rect.top <= 60 && rect.bottom >= 60) {
-          setIsDarkBg(false);
-          return;
-        }
-      }
-      setIsDarkBg(true);
-    };
-
-    checkBg();
-    window.addEventListener('scroll', checkBg);
-    window.addEventListener('resize', checkBg);
-    return () => {
-      window.removeEventListener('scroll', checkBg);
-      window.removeEventListener('resize', checkBg);
-    };
+    if (navType === 'POP') scrollTo(0, { immediate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
-  
-  // Global Mouse Tracking
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isHoveringGlobal, setIsHoveringGlobal] = useState(false);
 
+  // Fetch the secondary routes while idle so the page curtain never waits on the network.
   useEffect(() => {
-    const updateMousePosition = (e: MouseEvent) => setMousePosition({ x: e.clientX, y: e.clientY });
-    const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      setIsHoveringGlobal(!!(target.tagName.toLowerCase() === 'a' || target.tagName.toLowerCase() === 'button' || target.closest('a') || target.closest('button')));
-    };
+    if (!revealed) return;
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500));
+    const id = idle(() => { void loadTeam(); void loadPricing(); });
+    return () => (window.cancelIdleCallback ?? window.clearTimeout)(id);
+  }, [revealed]);
 
-    window.addEventListener("mousemove", updateMousePosition);
-    window.addEventListener("mouseover", handleMouseOver);
-    return () => {
-      window.removeEventListener("mousemove", updateMousePosition);
-      window.removeEventListener("mouseover", handleMouseOver);
-    };
+  // Late layout changes (images, fonts, filtered grids) must re-measure every ScrollTrigger.
+  useEffect(() => {
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => ScrollTrigger.refresh());
+    });
+    ro.observe(document.body);
+    return () => { ro.disconnect(); cancelAnimationFrame(frame); };
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#CCFF00] selection:text-black relative overflow-x-clip">
-      <Analytics />
-      <SpeedInsights/>
-      
-      <AnimatePresence mode="wait" onExitComplete={() => setPreloaderUnmounted(true)}>
-        {loading && <Preloader key="preloader" onComplete={handlePreloaderComplete} />}
-      </AnimatePresence>
+    <IntroContext.Provider value={revealed}>
+      <a
+        href="#main"
+        className="fixed left-6 top-6 -translate-y-24 rounded-full bg-lime px-5 py-3 font-semibold text-ink transition-transform duration-200 focus:translate-y-0"
+        style={{ zIndex: 'var(--z-cursor)' }}
+      >
+        Skip to content
+      </a>
 
-      <MobileWarning />
+      {showPreloader && <Preloader onReveal={handleReveal} onDone={handleDone} />}
 
-      {/* Screen Edge Bezel Frames */}
-      <div className={`fixed top-0 left-0 right-0 h-3 md:h-5 z-[100] pointer-events-none transition-colors duration-500 ${isDarkBg ? 'bg-white' : 'bg-[#0a0a0a]'}`} />
-      <div className={`fixed bottom-0 left-0 right-0 h-3 md:h-5 z-[100] pointer-events-none transition-colors duration-500 ${isDarkBg ? 'bg-white' : 'bg-[#0a0a0a]'}`} />
-      <div className={`fixed top-0 bottom-0 left-0 w-3 md:w-5 z-[100] pointer-events-none transition-colors duration-500 ${isDarkBg ? 'bg-white' : 'bg-[#0a0a0a]'}`} />
-      <div className={`fixed top-0 bottom-0 right-0 w-3 md:w-5 z-[100] pointer-events-none transition-colors duration-500 ${isDarkBg ? 'bg-white' : 'bg-[#0a0a0a]'}`} />
+      <Bezel />
+      <Navbar />
 
-      {/* SVG Screen Corners Masks */}
-      <svg className={`fixed top-3 md:top-5 left-3 md:left-5 pointer-events-none z-[100] w-8 h-8 md:w-12 md:h-12 transition-colors duration-500 ${isDarkBg ? 'text-white' : 'text-[#0a0a0a]'}`} viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 0C22.4 0 0 22.4 0 50V0H50Z" fill="currentColor" />
-      </svg>
-      <svg className={`fixed top-3 md:top-5 right-3 md:right-5 pointer-events-none z-[100] w-8 h-8 md:w-12 md:h-12 rotate-90 transition-colors duration-500 ${isDarkBg ? 'text-white' : 'text-[#0a0a0a]'}`} viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 0C22.4 0 0 22.4 0 50V0H50Z" fill="currentColor" />
-      </svg>
-      <svg className={`fixed bottom-3 md:bottom-5 left-3 md:left-5 pointer-events-none z-[100] w-8 h-8 md:w-12 md:h-12 -rotate-90 transition-colors duration-500 ${isDarkBg ? 'text-white' : 'text-[#0a0a0a]'}`} viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 0C22.4 0 0 22.4 0 50V0H50Z" fill="currentColor" />
-      </svg>
-      <svg className={`fixed bottom-3 md:bottom-5 right-3 md:right-5 pointer-events-none z-[100] w-8 h-8 md:w-12 md:h-12 rotate-180 transition-colors duration-500 ${isDarkBg ? 'text-white' : 'text-[#0a0a0a]'}`} viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 0C22.4 0 0 22.4 0 50V0H50Z" fill="currentColor" />
-      </svg>
-
-      <CustomCursor globalMouse={mousePosition} isHovering={isHoveringGlobal} />
-      <CinematicNoise />
-      <GlowOrb mousePosition={mousePosition} />
-      {preloaderUnmounted && <ScrollProgress />}
-      <ContactWidget />
-
-      {/* Centered screen content wrapper (removes outer width constraint to let section backgrounds span full bezel-width, only mounts after preloader unmounts) */}
-      {preloaderUnmounted && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="w-full min-h-screen bg-black relative flex flex-col pt-3 md:pt-5 pb-3 md:pb-5 px-3 md:px-5"
-        >
-          <Navbar />
-
-          <main className="flex-1 w-full relative">
+      <div className="bg-ink px-(--bezel) pb-(--bezel)">
+        <main id="main" key={pathname} className="relative">
+          <Suspense fallback={<div className="min-h-[100svh]" />}>
             <Routes>
-              <Route path="/" element={<Home loading={!preloaderUnmounted} />} />
-              <Route path="/team" element={<TeamPage mousePosition={mousePosition} />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/team" element={<TeamPage />} />
               <Route path="/pricing" element={<PricingPage />} />
             </Routes>
-          </main>
+          </Suspense>
+        </main>
+        <Footer />
+      </div>
 
-          <Footer />
-        </motion.div>
-      )}
-    </div>
+      <FloatingQuote />
+      <QuoteModal />
+      <Cursor />
+      <div className="grain" aria-hidden />
+
+      <Analytics />
+      <SpeedInsights />
+    </IntroContext.Provider>
   );
 }
-
-export default App;

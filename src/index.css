@@ -1,112 +1,188 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Cormorant+Garamond:ital,wght@1,300;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;700&family=Syne:wght@700;800&display=swap');
-
+@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
 @import "tailwindcss";
 
+/* Palette is locked to the original brand: off-black, black, white, paper, lime, cyan. */
 @theme {
-  --color-neon-lime: #CCFF00;
-  --color-neon-cyan: #00F0FF;
-  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque', 'Syne', sans-serif;
-  --font-serif: 'Cormorant Garamond', Georgia, serif;
-  --font-mono: 'Space Grotesk', monospace;
+  --color-ink: #0a0a0a;
+  --color-paper: #fafafa;
+  --color-lime: #ccff00;
+  --color-cyan: #00f0ff;
+
+  --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root {
+  /* Systemic layers only. */
+  --z-content: 1;
+  --z-float: 30;
+  --z-chrome: 40;
+  --z-grain: 50;
+  --z-menu: 60;
+  --z-modal: 70;
+  --z-curtain: 80;
+  --z-preloader: 90;
+  --z-cursor: 100;
+
+  --bezel: 0.75rem;
+  --focus: var(--color-lime);
+  --chrome: var(--color-ink);
+  --chrome-ink: #ffffff;
+}
+
+@media (min-width: 768px) {
+  :root { --bezel: 1.25rem; }
+}
+
+/* The bezel and nav take the opposite tone of the section under the nav line. */
+html[data-chrome='light'] { --chrome: #ffffff; --chrome-ink: var(--color-ink); }
+
+[data-surface='light'],
+[data-surface='lime'] {
+  --focus: var(--color-ink);
 }
 
 @layer base {
   html {
-    scroll-behavior: smooth;
-    cursor: none; /* Hide default cursor to show custom one */
+    background: var(--color-ink);
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-black text-white antialiased;
+    @apply bg-ink text-white antialiased;
+    font-family: var(--font-sans);
     overflow-x: clip;
+    text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1, h2, h3, h4 {
     font-family: var(--font-display);
+    font-optical-sizing: auto;
+    text-wrap: balance;
   }
-  
-  /* Restore default cursor on touch devices */
-  @media (pointer: coarse) {
-    html {
-      cursor: auto;
+
+  p { text-wrap: pretty; }
+
+  ::selection {
+    background: var(--color-lime);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  button, a, [role='button'], [role='slider'] {
+    touch-action: manipulation;
+  }
+
+  button, [role='button'], [role='slider'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input, textarea, select {
+    font-size: 16px;
+  }
+
+  /* Custom cursor: only on mouse devices, only while the pointer is in use. */
+  html.has-cursor,
+  html.has-cursor * {
+    cursor: none !important;
+  }
+  html.has-cursor input,
+  html.has-cursor textarea {
+    cursor: text !important;
+  }
+
+  /* Lenis */
+  html.lenis, html.lenis body { height: auto; }
+  .lenis.lenis-smooth { scroll-behavior: auto !important; }
+  .lenis.lenis-stopped { overflow: clip; }
+  [data-lenis-prevent] { overscroll-behavior: contain; }
+  html.scroll-locked { overflow: hidden; }
+}
+
+@utility container-x {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 4rem);
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Animated underline for text links. */
+@utility link-line {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 100% 100%;
+  background-repeat: no-repeat;
+  transition: background-size 400ms var(--ease-out);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-size: 100% 1px;
+      background-position: 0% 100%;
     }
   }
 }
 
-@layer utilities {
-  .text-stroke-2 {
-    -webkit-text-stroke: 2px currentColor;
-  }
-  
-  .text-stroke-white {
-    -webkit-text-stroke-color: white;
-  }
-  
-  .text-stroke-lime {
-    -webkit-text-stroke-color: #CCFF00;
-  }
+/* Press feedback for every pressable surface. */
+@utility pressable {
+  transition: transform 160ms var(--ease-out);
+  &:active { transform: scale(0.97); }
+}
 
-  @keyframes cloudTrafficDash {
-    to {
-      stroke-dashoffset: -50;
-    }
-  }
-
-  .cloud-traffic-path {
-    stroke-dasharray: 6 12;
-    animation: cloudTrafficDash 1.2s linear infinite;
-  }
-
-  .step-circle-hover {
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .group:hover .step-circle-hover:not(.active-step) {
-    background-color: var(--hover-accent) !important;
-    border-color: var(--hover-accent) !important;
-    color: black !important;
-    box-shadow: 0 0 25px var(--hover-accent), 0 0 10px var(--hover-accent) !important;
-  }
-
-  .group:hover div[style*="--hover-accent"] {
-    border-color: rgba(255, 255, 255, 0.15) !important;
-    background-color: rgba(255, 255, 255, 0.05) !important;
-  }
-
-  @keyframes borderGlow {
-    0%, 100% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-  }
-
-  .glow-border-flow {
-    position: relative;
-  }
-
-  .glow-border-flow::before {
-    content: '';
-    position: absolute;
-    inset: -1.5px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: linear-gradient(90deg, #CCFF00, #00F0FF, #CCFF00);
-    background-size: 200% 200%;
-    animation: borderGlow 4s linear infinite;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+@layer components {
+  .grain {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-grain);
     pointer-events: none;
+    opacity: 0.045;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  .glow-card-shadow {
-    box-shadow: 0 0 30px rgba(0, 240, 255, 0.03), 0 0 10px rgba(204, 255, 0, 0.03);
+  /* Packets travelling along an infrastructure path (Expertise). */
+  .traffic {
+    stroke-dasharray: 10 15;
+    animation: traffic 1.2s linear infinite;
+  }
+  @keyframes traffic {
+    to { stroke-dashoffset: -50; }
   }
 
-  .glow-card-shadow-active {
-    box-shadow: 0 0 40px rgba(204, 255, 0, 0.15), 0 0 15px rgba(0, 240, 255, 0.1);
+  /* Split-text lines are masked so words rise from behind a baseline. */
+  .split-mask {
+    overflow: clip;
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
