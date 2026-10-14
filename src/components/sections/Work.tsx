@@ -3,28 +3,58 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { projects } from '../../data';
 import type { Project } from '../../types';
 import { EASE } from '../../motion/tokens';
-import ProjectCard from '../ui/ProjectCard';
+import ProjectCard, { type CardVariant } from '../ui/ProjectCard';
 import ProjectDrawer from '../ui/ProjectDrawer';
 import SplitReveal from '../ui/SplitReveal';
 
 const categories = Array.from(new Set(projects.map((p) => p.category)));
 const tabId = (cat: string) => `tab-${cat.toLowerCase().replace(/\s+/g, '-')}`;
 
+interface Cell {
+  project: Project;
+  variant: CardVariant;
+  column: string;
+  row: string;
+}
+
 /**
- * Desktop rhythm repeats every four cards: wide, offset-tall, tall, offset-wide.
- * Offsets break the row baseline so the grid reads as a layout, not a table.
+ * Bento layout on explicit grid lines (desktop). Groups of three become one feature cell spanning two
+ * rows beside two stacked tiles, alternating sides; the feature must be a tall, full-page screenshot.
+ * Groups without one fall back to half-width pairs, and a single leftover takes a full-width row.
  */
-const RHYTHM = [
-  { span: 'md:col-span-7', tall: false, offset: '' },
-  { span: 'md:col-span-5', tall: true, offset: 'md:mt-40' },
-  { span: 'md:col-span-5', tall: true, offset: '' },
-  { span: 'md:col-span-7', tall: false, offset: 'md:mt-40' },
-];
+function layout(items: Project[]): Cell[] {
+  const cells: Cell[] = [];
+  let i = 0, row = 1, flip = false;
+  while (i < items.length) {
+    const group = items.slice(i, i + 3);
+    const feature = group.length === 3 ? group.find((p) => !p.landscape) : undefined;
+    if (feature) {
+      const [a, b] = group.filter((p) => p !== feature);
+      const [fCol, tCol] = flip ? ['6 / 13', '1 / 6'] : ['1 / 8', '8 / 13'];
+      cells.push(
+        { project: feature, variant: 'feature', column: fCol, row: `${row} / span 2` },
+        { project: a, variant: 'tile', column: tCol, row: `${row}` },
+        { project: b, variant: 'tile', column: tCol, row: `${row + 1}` },
+      );
+      i += 3; row += 2; flip = !flip;
+    } else if (items.length - i >= 2) {
+      cells.push(
+        { project: items[i], variant: 'tile', column: '1 / 7', row: `${row}` },
+        { project: items[i + 1], variant: 'tile', column: '7 / 13', row: `${row}` },
+      );
+      i += 2; row += 1;
+    } else {
+      cells.push({ project: items[i], variant: 'wide', column: '1 / 13', row: `${row}` });
+      i += 1; row += 1;
+    }
+  }
+  return cells;
+}
 
 export default function Work() {
   const [active, setActive] = useState(categories[0]);
   const [open, setOpen] = useState<Project | null>(null);
-  const visible = useMemo(() => projects.filter((p) => p.category === active), [active]);
+  const cells = useMemo(() => layout(projects.filter((p) => p.category === active)), [active]);
   const close = useCallback(() => setOpen(null), []);
 
   // Arrow keys move between tabs (WAI-ARIA tabs pattern).
@@ -98,16 +128,14 @@ export default function Work() {
               animate={{ opacity: 1, transform: 'translateY(0px)' }}
               exit={{ opacity: 0, transform: 'translateY(-12px)', transition: { duration: 0.2, ease: EASE.out } }}
               transition={{ duration: 0.5, ease: EASE.out }}
-              className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-4 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-12 md:gap-x-10 md:gap-y-24 md:overflow-visible md:px-0 md:pb-0 lg:gap-x-16"
+              className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-4 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-12 md:gap-x-5 md:gap-y-10 md:overflow-visible md:px-0 md:pb-0"
             >
-              {visible.map((project, i) => {
-                const r = RHYTHM[i % RHYTHM.length];
-                return (
-                  <li key={project.id} className={`w-[84vw] shrink-0 snap-start md:w-auto ${r.span} ${r.offset}`}>
-                    <ProjectCard project={project} tall={r.tall} onOpen={setOpen} />
-                  </li>
-                );
-              })}
+              {cells.map(({ project, variant, column, row }) => (
+                // Grid placement is ignored by the mobile flex row, so the inline lines only bite on desktop.
+                <li key={project.id} className="w-[84vw] shrink-0 snap-start md:w-auto" style={{ gridColumn: column, gridRow: row }}>
+                  <ProjectCard project={project} variant={variant} onOpen={setOpen} />
+                </li>
+              ))}
             </motion.ul>
           </AnimatePresence>
           <p className="mt-4 text-sm text-ink/45 md:hidden">Swipe for more</p>

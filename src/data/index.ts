@@ -5,7 +5,13 @@ import type { Project, ProcessStep, TeamMember, PricingPlan, Testimonial } from 
 // (Glob patterns must be literals, hence the repetition.)
 const shotSrc = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg,png}', '../assets/{zoviq-full,doc,pet,polymind,children,aarogyam,spa,zumba}.png'], { query: '?w=1100&quality=72&format=webp', import: 'default', eager: true });
 const shotSet = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg,png}', '../assets/{zoviq-full,doc,pet,polymind,children,aarogyam,spa,zumba}.png'], { query: '?w=560;1100&quality=72&format=webp&as=srcset', import: 'default', eager: true });
-const shot = (file: string) => ({ image: shotSrc[`../assets/${file}`], srcSet: shotSet[`../assets/${file}`] });
+// Screenshots that are a single screen tall: they only ever get landscape frames.
+const LANDSCAPE = new Set(['doc.png', 'soft1.png', 'soft2.png', 'soft3.png', 'soft4.png', 'soft5.png', 'port3.png']);
+const shot = (file: string) => ({
+  image: shotSrc[`../assets/${file}`],
+  srcSet: shotSet[`../assets/${file}`],
+  landscape: LANDSCAPE.has(file),
+});
 
 // Case study: an illustrative recreation of the old boxy site vs. the live redesign (top of the page).
 import zoviqBefore from '../assets/zoviq-before.png?w=1400&h=875&fit=cover&position=top&quality=80&format=webp';
@@ -261,7 +267,7 @@ export const team: TeamMember[] = [
   { id: 1, name: 'Akshar', role: 'Lead Software Developer', github: 'https://github.com/aksharkh', linkedin: 'https://www.linkedin.com/in/akshar-k-h-1b404521b/', image: akshar },
   { id: 2, name: 'Abhinav', role: 'Software Engineer', github: 'https://github.com/abhinavrbharadwaj7', linkedin: 'https://www.linkedin.com/in/abhinavrbharadwaj/', image: abhinav },
   { id: 3, name: 'Adnaan', role: 'FullStack Developer', github: 'https://github.com/Khan012003', linkedin: 'https://www.linkedin.com/in/adnaan-khan-153042319/', image: adnaan },
-  { id: 4, name: 'Bhuvan', role: 'Java FullStack Developer', github: 'https://github.com/AKlRA', linkedin: 'https://www.linkedin.com/in/bhuvan-mh-0144492a8/', image: bhuvan },
+  { id: 4, name: 'Bhuvan', role: 'Full Stack Developer', github: 'https://github.com/AKlRA', linkedin: 'https://www.linkedin.com/in/bhuvan-mh-0144492a8/', image: bhuvan },
 ];
 
 export const pricingPlans: PricingPlan[] = [

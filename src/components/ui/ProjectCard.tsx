@@ -5,9 +5,18 @@ import { MQ } from '../../motion/tokens';
 import type { Project } from '../../types';
 import { displayUrl } from '../../lib/displayUrl';
 
+/** feature: the large cell that spans two rows; tile: a standard cell; wide: a full-width row. */
+export type CardVariant = 'feature' | 'tile' | 'wide';
+
+const FRAME: Record<CardVariant, string> = {
+  feature: 'aspect-[16/11] md:aspect-auto md:min-h-[24rem] md:flex-1',
+  tile: 'aspect-[16/11] md:aspect-[16/10]',
+  wide: 'aspect-[16/11] md:aspect-[21/9]',
+};
+
 interface ProjectCardProps {
   project: Project;
-  tall?: boolean;
+  variant?: CardVariant;
   onOpen: (project: Project) => void;
 }
 
@@ -18,7 +27,7 @@ const PREVIEW_SPEED = 90;
  * Screenshot in a frame. On mouse devices the frame tilts toward the pointer and the
  * full-page screenshot scrolls itself while hovered; everywhere it wipes in once on entry.
  */
-export default function ProjectCard({ project, tall = false, onOpen }: ProjectCardProps) {
+export default function ProjectCard({ project, variant = 'tile', onOpen }: ProjectCardProps) {
   const root = useRef<HTMLElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLButtonElement>(null);
@@ -86,8 +95,8 @@ export default function ProjectCard({ project, tall = false, onOpen }: ProjectCa
   );
 
   return (
-    <article ref={root} className="group/card">
-      <div ref={tilt} className="will-change-transform">
+    <article ref={root} className="group/card flex h-full flex-col">
+      <div ref={tilt} className="flex flex-1 flex-col will-change-transform">
         <button
           ref={frame}
           type="button"
@@ -95,11 +104,11 @@ export default function ProjectCard({ project, tall = false, onOpen }: ProjectCa
           data-cursor="view"
           aria-label={`${project.title}: view details`}
           className={`relative block w-full overflow-hidden rounded-[1.25rem] bg-ink ring-1 ring-ink/10 [clip-path:inset(100%_0_0_0_round_1.25rem)] transition-[clip-path] duration-[1.1s] ease-(--ease-in-out) group-data-[in]/card:[clip-path:inset(0_0_0_0_round_1.25rem)] motion-reduce:[clip-path:none] ${
-            tall ? 'aspect-[16/11] md:aspect-[4/5]' : 'aspect-[16/11]'
+            FRAME[variant]
           }`}
         >
           {/* Scale lives on the wrapper so the hover scroll (on the img) never inherits its transition. */}
-          <div className="absolute inset-x-0 top-0 origin-top scale-[1.06] transition-transform duration-[1.4s] ease-(--ease-out) group-data-[in]/card:scale-100">
+          <div className="absolute inset-0 origin-top scale-[1.06] transition-transform duration-[1.4s] ease-(--ease-out) group-data-[in]/card:scale-100">
             <img
               ref={img}
               src={project.image}
@@ -108,12 +117,13 @@ export default function ProjectCard({ project, tall = false, onOpen }: ProjectCa
               alt={`${project.title} website, full-page screenshot`}
               loading="lazy"
               decoding="async"
-              className="w-full"
+              // Taller than the frame: hangs from the top and scrolls on hover. Shorter: covers it.
+              className="min-h-full w-full object-cover object-top"
             />
           </div>
         </button>
       </div>
-      <div className="mt-5 flex items-start justify-between gap-6">
+      <div className="mt-4 flex items-start justify-between gap-6">
         <div className="min-w-0">
           <h3 className="text-display text-[clamp(1.75rem,2.6vw,2.6rem)] leading-none">{project.title}</h3>
           <p className="mt-2 truncate text-sm text-ink/55">{displayUrl(project.link)}</p>

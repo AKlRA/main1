@@ -4,6 +4,8 @@ export interface Project {
   category: string;
   image: string;
   srcSet: string;
+  /** The screenshot is one screen tall, so it never goes in a portrait frame. */
+  landscape: boolean;
   link: string;
   tags: string[];
 }
