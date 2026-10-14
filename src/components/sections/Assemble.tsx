@@ -34,24 +34,40 @@ function mixedProjects() {
 
 const boxStyle = (b: Box): CSSProperties => ({ left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: b.r });
 
+/** Rounded-rectangle subpath (radius clamped so a narrow, mid-wipe piece stays a clean pill). */
+function roundRect(x: number, y: number, w: number, h: number, r: number) {
+  const k = Math.max(0, Math.min(r, w / 2, h / 2));
+  if (k < 0.5) return `M${x} ${y}h${w}v${h}h${-w}Z`;
+  return (
+    `M${x + k} ${y}h${w - 2 * k}a${k} ${k} 0 0 1 ${k} ${k}v${h - 2 * k}a${k} ${k} 0 0 1 ${-k} ${k}` +
+    `h${-(w - 2 * k)}a${k} ${k} 0 0 1 ${-k} ${-k}v${-(h - 2 * k)}a${k} ${k} 0 0 1 ${k} ${-k}Z`
+  );
+}
+
+/** Padding and corner radius of each revealed piece: shapes keep their own curve, text gets a soft one. */
+function pieceShape(b: Box) {
+  if (b.k === 'media') return { pad: 14, r: (b.r ?? 18) + 14 };
+  if (b.k === 'shape') return { pad: 3, r: (b.r ?? 8) + 3 };
+  return { pad: 6, r: 12 };
+}
+
 /**
  * Clip path that shows the live page through its own layout boxes, each wiped left to right in
  * reading order (`pieces` 0..1), then opens from the centre to the whole page (`full` 0..1).
  */
 function maskPath(board: Artboard, height: number, order: Box[], pieces: number, full: number) {
-  const rect = (x: number, y: number, w: number, h: number) => `M${x} ${y}h${w}v${h}h${-w}Z`;
   const step = 0.35;
   const span = (order.length - 1) * step + 1;
   let d = '';
   order.forEach((b, i) => {
     const p = Math.min(1, Math.max(0, pieces * span - i * step));
     if (p <= 0) return;
-    const pad = b.k === 'media' ? 18 : 4;
-    d += rect(b.x - pad, b.y - pad, (b.w + pad * 2) * p, b.h + pad * 2);
+    const { pad, r } = pieceShape(b);
+    d += roundRect(b.x - pad, b.y - pad, (b.w + pad * 2) * p, b.h + pad * 2, r);
   });
   if (full > 0) {
     const ix = ((1 - full) * board.w) / 2, iy = ((1 - full) * height) / 2;
-    d += rect(ix, iy, board.w - ix * 2, height - iy * 2);
+    d += roundRect(ix, iy, board.w - ix * 2, height - iy * 2, 28 * (1 - full));
   }
   return d ? `path('${d}')` : 'inset(50%)';
 }
