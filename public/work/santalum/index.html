@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Santalum Maison</title>
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Santalum Maison. Stories of red sandalwood, craft and provenance, from India's first sandalwood house." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400..700&family=Instrument+Sans:ital,wght@0,400..600;1,400..500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/light/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header class="top">
+    <a href="#top" class="logo" aria-label="Santalum Maison, home" data-home>
+      <span class="logo__mark">SM</span>
+      <span class="logo__date" data-today>Today</span>
+    </a>
+    <nav class="pillnav" aria-label="Primary">
+      <a href="#archive">Archive</a>
+      <a href="#collections">Collections</a>
+      <a href="#story-material" data-open="material">Material</a>
+      <a href="#story-craft" data-open="craft">Craft</a>
+      <a href="#circle">Enquiries</a>
+    </nav>
+    <div class="top__tools">
+      <button class="dot-btn" aria-label="Search"><i class="ph-light ph-magnifying-glass"></i></button>
+      <button class="dot-btn" data-bag-open aria-label="Open bag"><i class="ph-light ph-bag-simple"></i><b data-bag-count>0</b></button>
+      <button class="menu-pill" data-menu-open aria-expanded="false">Menu</button>
+    </div>
+  </header>
+
+  <!-- Mobile menu -->
+  <div class="menu" data-menu aria-hidden="true">
+    <nav aria-label="Menu">
+      <a href="#archive">Archive</a>
+      <a href="#collections">Collections</a>
+      <a href="#story-material" data-open="material">Material</a>
+      <a href="#story-craft" data-open="craft">Craft</a>
+      <a href="#story-vault" data-open="vault">The 2011 Vault</a>
+      <a href="#circle">Enquiries</a>
+    </nav>
+  </div>
+
+  <main id="top">
+
+    <!-- ============ 1. HERO: title, card deck, topics ============ -->
+    <section class="hero">
+      <div class="hero__title">
+        <h1><span class="ln"><span>Read the</span></span><span class="ln"><span>Grain</span></span></h1>
+        <a href="#archive" class="honey-btn">View all stories <span><i class="ph-light ph-arrow-right"></i></span></a>
+      </div>
+
+      <div class="deck" data-deck aria-roledescription="card stack" aria-label="Featured stories">
+        <!-- cards rendered by main.js -->
+      </div>
+
+      <ul class="topics" data-topics aria-label="Story topics">
+        <!-- topics rendered by main.js -->
+      </ul>
+
+      <div class="hero__foot">
+        <div class="infocus">
+          <small>In focus</small>
+          <p><a href="#story-material" data-open="material">#RedSandalwood</a><a href="#story-vault" data-open="vault">#The2011Vault</a><a href="#story-provenance" data-open="provenance">#Provenance</a></p>
+        </div>
+        <div class="joinus">
+          <small>Join us</small>
+          <a href="#" aria-label="Instagram"><i class="ph-fill ph-instagram-logo"></i></a>
+          <a href="#" aria-label="Pinterest"><i class="ph-fill ph-pinterest-logo"></i></a>
+          <a href="#" aria-label="YouTube"><i class="ph-fill ph-youtube-logo"></i></a>
+          <a href="https://wa.me/" aria-label="WhatsApp"><i class="ph-fill ph-whatsapp-logo"></i></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. MARQUEE ============ -->
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track" data-ticker>
+        <span>Santalum Maison</span><em>No. 21</em><span>Read the grain</span><i class="ph-fill ph-tree"></i><span>Numbered and registered</span><em>Since 1980</em><span>Red sandalwood only</span><i class="ph-fill ph-tree"></i>
+      </div>
+    </div>
+
+    <!-- ============ 3. ARCHIVE ============ -->
+    <section class="archive" id="archive">
+      <div class="archive__side">
+        <h2 class="reveal">The<br />Archive</h2>
+        <p class="reveal">Material, craft and provenance, told plainly. Open any story in full, or flick through the quick version.</p>
+        <div class="chips" data-filters role="group" aria-label="Filter stories"></div>
+      </div>
+      <ol class="rows" data-rows></ol>
+    </section>
+
+    <!-- ============ 4. COLLECTIONS RAIL ============ -->
+    <section class="collections" id="collections">
+      <div class="collections__head">
+        <h2 class="reveal">Shop the<br />Collections</h2>
+        <div class="rail-ctrl">
+          <button class="dot-btn dot-btn--line" data-rail-prev aria-label="Scroll collections left"><i class="ph-light ph-arrow-left"></i></button>
+          <button class="dot-btn dot-btn--ink" data-rail-next aria-label="Scroll collections right"><i class="ph-light ph-arrow-right"></i></button>
+        </div>
+      </div>
+      <div class="rail" data-rail tabindex="0" aria-label="Collections">
+        <a href="#" class="tile" style="--tint:#e6d2b5"><img src="https://images.unsplash.com/photo-1784570343031-649cce9a185c?w=800&q=75&auto=format&fit=crop" alt="Red-brown prayer beads" loading="lazy" draggable="false" /><span class="tile__k">01</span><strong>Beads &amp; Malas</strong></a>
+        <a href="#" class="tile" style="--tint:#c4c4a0"><img src="https://images.unsplash.com/photo-1762328491699-0d46a97cbd2c?w=800&q=75&auto=format&fit=crop" alt="Red beads with silver caps" loading="lazy" draggable="false" /><span class="tile__k">02</span><strong>Jewellery</strong></a>
+        <a href="#" class="tile" style="--tint:#ddb39a"><img src="https://images.unsplash.com/photo-1790244528184-c9e3fdccde63?w=800&q=75&auto=format&fit=crop" alt="Turned wooden objects" loading="lazy" draggable="false" /><span class="tile__k">03</span><strong>Everyday Objects</strong></a>
+        <a href="#" class="tile" style="--tint:#e3bd7f"><img src="https://images.unsplash.com/photo-1702001382966-e464275080ef?w=800&q=75&auto=format&fit=crop" alt="Amber vial of sandalwood" loading="lazy" draggable="false" /><span class="tile__k">04</span><strong>Powder &amp; Material</strong></a>
+        <a href="#" class="tile" style="--tint:#cfae8a"><img src="https://images.unsplash.com/photo-1636978669347-ebc543a814f3?w=800&q=75&auto=format&fit=crop" alt="Coil of sandalwood incense" loading="lazy" draggable="false" /><span class="tile__k">05</span><strong>Gifting</strong></a>
+      </div>
+    </section>
+
+    <!-- ============ 5. CIRCLE ============ -->
+    <section class="circle" id="circle">
+      <div class="circle__card reveal">
+        <h2>Join the<br />Santalum Circle</h2>
+        <p>New editions, new stories and invitations to private viewings. A few letters a year.</p>
+        <form class="circle__form" onsubmit="event.preventDefault(); this.classList.add('is-done');">
+          <label for="circle-email">Email address</label>
+          <div>
+            <input id="circle-email" type="email" required autocomplete="email" placeholder="you@example.com" />
+            <button type="submit" class="honey-btn">Join <span><i class="ph-light ph-arrow-right"></i></span></button>
+          </div>
+          <small class="circle__done" role="status">Thank you. You are on the list.</small>
+        </form>
+        <a href="https://wa.me/" class="circle__alt"><i class="ph-fill ph-whatsapp-logo"></i> Private enquiries on WhatsApp</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="footer__words" aria-hidden="true" data-words></div>
+    <div class="footer__inner">
+      <p class="footer__big">Santalum<br />Maison</p>
+      <div class="footer__cols">
+        <nav aria-label="Stories"><h4>Stories</h4><a href="#archive">The Archive</a><a href="#story-material" data-open="material">Material</a><a href="#story-craft" data-open="craft">Craft</a><a href="#story-provenance" data-open="provenance">Provenance</a></nav>
+        <nav aria-label="Shop"><h4>Shop</h4><a href="#collections">Collections</a><a href="#story-vault" data-open="vault">The 2011 Vault</a><a href="#story-gifting" data-open="gifting">Gifting</a><a href="#circle">Corporate</a></nav>
+        <nav aria-label="Support"><h4>Support</h4><a href="#">Shipping</a><a href="#">Returns</a><a href="#">Privacy</a><a href="#">CITES Compliance</a></nav>
+      </div>
+      <div class="footer__base">
+        <small>© 2026 Santalum Maison. Since 1980.</small>
+        <small>All pieces individually numbered and registered. Provenance documentation available on request.</small>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============ STORY VIEW (opens from any card or row) ============ -->
+  <div class="story" data-story role="dialog" aria-modal="true" aria-label="Story" tabindex="-1" hidden>
+    <div class="story__bar">
+      <button class="back" data-story-close><i class="ph-light ph-arrow-left"></i> Archive</button>
+      <div class="mode" role="group" aria-label="Story mode">
+        <span>Full story</span>
+        <button class="switch" data-mode-toggle role="switch" aria-checked="false" aria-label="Quick story"><i></i></button>
+        <span>Quick story</span>
+      </div>
+    </div>
+    <div class="story__body" data-story-body></div>
+  </div>
+
+  <!-- ============ BAG ============ -->
+  <div class="scrim" data-scrim></div>
+  <aside class="bag" data-bag aria-label="Shopping bag" aria-hidden="true">
+    <header><h2>Your Bag</h2><button class="dot-btn dot-btn--line" data-bag-close aria-label="Close bag"><i class="ph-light ph-x"></i></button></header>
+    <div class="bag__empty">
+      <p>Your bag is empty.</p>
+      <small>Begin with the current edition, or browse the collections.</small>
+      <a href="#collections" class="honey-btn" data-bag-close>Shop the Collections <span><i class="ph-light ph-arrow-right"></i></span></a>
+    </div>
+  </aside>
+
+  <script src="stories.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

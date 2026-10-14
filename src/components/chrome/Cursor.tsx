@@ -88,7 +88,11 @@ function CursorInner() {
       setState(state, text);
       r.dataset.tone = toneAt(target);
     };
-    const onOver = (e: PointerEvent) => inspect(e.target);
+    const onOver = (e: PointerEvent) => {
+      // Pointer events stop at an embedded page; hand over to its native cursor until we get them back.
+      if (e.target instanceof HTMLIFrameElement) { onLeave(); return; }
+      inspect(e.target);
+    };
     // Scrolling moves new content under a still pointer without firing pointerover, so re-check
     // what is under it (at most once per frame) whenever the page scrolls.
     let pending = 0;
