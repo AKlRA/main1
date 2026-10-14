@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Cpu, Database, StackSimple } from '@phosphor-icons/react';
 import { gsap, useGSAP } from '../../motion/gsap';
-import { MQ } from '../../motion/tokens';
 import { useInView } from '../../hooks/useInView';
 import SplitReveal from '../ui/SplitReveal';
+import MorphStage from '../expertise/MorphStage';
 
 const card = 'xp-card relative flex flex-col overflow-hidden rounded-[1.5rem] bg-white/[0.03] p-7 ring-1 ring-white/10 md:p-9';
 const action =
@@ -18,54 +18,6 @@ function CardHead({ icon, title, children }: { icon: ReactNode; title: string; c
       </div>
       <p className="mt-4 max-w-[46ch] text-base leading-relaxed text-white/65">{children}</p>
     </>
-  );
-}
-
-/** A wireframe cube that idles on its own and leans toward the pointer. */
-function Cube() {
-  const stage = useRef<HTMLDivElement>(null);
-  const tilt = useRef<HTMLDivElement>(null);
-  const spin = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      gsap.set(tilt.current, { rotationX: -18, rotationY: 24 });
-      const mm = gsap.matchMedia();
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
-        gsap.to(spin.current, { rotationY: 360, duration: 28, ease: 'none', repeat: -1 });
-      });
-      mm.add(`${MQ.finePointer} and (prefers-reduced-motion: no-preference)`, () => {
-        const el = stage.current!;
-        const rx = gsap.quickTo(tilt.current, 'rotationX', { duration: 0.8, ease: 'ax.out' });
-        const ry = gsap.quickTo(tilt.current, 'rotationY', { duration: 0.8, ease: 'ax.out' });
-        const move = (e: PointerEvent) => {
-          const b = el.getBoundingClientRect();
-          rx(-18 - ((e.clientY - b.top) / b.height - 0.5) * 50);
-          ry(24 + ((e.clientX - b.left) / b.width - 0.5) * 70);
-        };
-        const leave = () => { rx(-18); ry(24); };
-        el.addEventListener('pointermove', move);
-        el.addEventListener('pointerleave', leave);
-        return () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerleave', leave); };
-      });
-      return () => mm.revert();
-    },
-    { scope: stage },
-  );
-
-  const faces = ['rotateY(0deg)', 'rotateY(180deg)', 'rotateY(90deg)', 'rotateY(-90deg)', 'rotateX(90deg)', 'rotateX(-90deg)'];
-  return (
-    <div ref={stage} data-cursor="drag" data-cursor-label="Tilt" className="relative mt-8 grid flex-1 place-items-center rounded-[1.1rem] bg-ink/60 py-14 ring-1 ring-white/8 [perspective:700px]">
-      <div aria-hidden className="absolute inset-0 rounded-[inherit] bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:24px_24px]" />
-      <div ref={tilt} className="relative size-32 [--half:4rem] [transform-style:preserve-3d] md:size-52 md:[--half:6.5rem]">
-        <div ref={spin} className="absolute inset-0 [transform-style:preserve-3d]">
-          {faces.map((f) => (
-            <div key={f} className="absolute inset-0 border border-lime/50 bg-lime/[0.04]" style={{ transform: `${f} translateZ(var(--half))` }} />
-          ))}
-          <div className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-lime shadow-[0_0_24px_rgba(204,255,0,0.7)]" />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -216,7 +168,7 @@ export default function Expertise() {
             <CardHead icon={<Cpu size={20} weight="duotone" />} title="Frontend">
               We push browser limits. Using React, Vite, and custom shaders, we build buttery-smooth, interactive interfaces.
             </CardHead>
-            <Cube />
+            <MorphStage />
           </article>
           <article className={`${card} md:col-span-5`}>
             <CardHead icon={<Database size={20} weight="duotone" />} title="Backend">

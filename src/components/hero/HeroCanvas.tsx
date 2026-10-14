@@ -1,17 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { HeroScene } from './HeroScene';
+import { webglAvailable } from '../../lib/webgl';
 
 export interface HeroCanvasHandle {
   setScroll: (p: number) => void;
-}
-
-function webglAvailable() {
-  try {
-    const c = document.createElement('canvas');
-    return !!(c.getContext('webgl2') || c.getContext('webgl'));
-  } catch {
-    return false;
-  }
 }
 
 /**

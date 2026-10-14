@@ -42,7 +42,7 @@ export default function Work() {
       id="work"
       data-chrome="dark"
       data-surface="light"
-      className="relative rounded-[1.25rem] bg-paper pb-16 pt-24 text-ink md:rounded-[2rem] md:py-36"
+      className="relative rounded-[1.25rem] bg-paper pb-16 pt-36 text-ink md:rounded-[2rem] md:pb-36 md:pt-56"
     >
       <div className="container-x">
         <header className="flex items-end justify-between gap-6">

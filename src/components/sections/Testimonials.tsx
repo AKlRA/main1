@@ -29,12 +29,13 @@ function Comparison({ before, after, company }: { before: string; after: string;
   const apply = useCallback((p: number) => {
     pos.current = Math.min(1, Math.max(0, p));
     const pct = pos.current * 100;
-    afterLayer.current!.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+    afterLayer.current!.style.clipPath = `inset(0 0 0 ${pct}%)`;
     handle.current!.style.transform = `translateX(${pct}%)`;
     knob.current!.setAttribute('aria-valuenow', String(Math.round(pct)));
     METRICS.forEach((m, i) => {
       const el = values.current[i];
-      if (el) el.textContent = m.format(m.from + (m.to - m.from) * pos.current);
+      // The more of the redesign is showing (handle further left), the closer to the "after" figures.
+      if (el) el.textContent = m.format(m.to + (m.from - m.to) * pos.current);
     });
   }, []);
 
@@ -49,12 +50,12 @@ function Comparison({ before, after, company }: { before: string; after: string;
       apply(0.5);
       const mm = gsap.matchMedia();
       mm.add('(prefers-reduced-motion: no-preference)', () => {
-        const proxy = { p: 0.12 };
+        const proxy = { p: 0.88 };
         gsap.to(proxy, {
           p: 0.5,
           duration: 1.6,
           ease: 'ax.inOut',
-          onStart: () => apply(0.12),
+          onStart: () => apply(0.88),
           onUpdate: () => { if (!dragging.current) apply(proxy.p); },
           scrollTrigger: { trigger: box.current, start: 'top 70%', once: true },
         });
@@ -83,7 +84,7 @@ function Comparison({ before, after, company }: { before: string; after: string;
         onPointerCancel={() => { dragging.current = false; }}
         className="relative aspect-[16/10] select-none overflow-hidden rounded-[1.5rem] bg-white/5 ring-1 ring-white/10 [touch-action:pan-y]"
       >
-        <img src={before} alt={`${company} website before the redesign`} draggable={false} className="absolute inset-0 size-full object-cover object-top grayscale-[0.6]" />
+        <img src={before} alt={`${company} website before the redesign (illustrative recreation)`} draggable={false} className="absolute inset-0 size-full object-cover object-top grayscale-[0.6]" />
         <div ref={afterLayer} className="absolute inset-0">
           <img src={after} alt={`${company} website after the Axoraa redesign`} draggable={false} className="size-full object-cover object-top" />
         </div>
@@ -118,7 +119,7 @@ function Comparison({ before, after, company }: { before: string; after: string;
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs text-white/45">Figures move with the slider: before on the left, after on the right.</p>
+      <p className="mt-3 text-xs text-white/45">Drag left to reveal more of the redesign; the figures follow. Before shown as an illustrative recreation.</p>
     </div>
   );
 }

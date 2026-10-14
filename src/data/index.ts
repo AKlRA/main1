@@ -7,9 +7,9 @@ const shotSrc = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg
 const shotSet = import.meta.glob<string>(['../assets/{main,cafe,soft,port}*.{jpg,png}', '../assets/{zoviq-full,doc,pet,polymind,children,aarogyam,spa,zumba}.png'], { query: '?w=560;1100&quality=72&format=webp&as=srcset', import: 'default', eager: true });
 const shot = (file: string) => ({ image: shotSrc[`../assets/${file}`], srcSet: shotSet[`../assets/${file}`] });
 
-// Case study before / after
-import zoviq from '../assets/zoviq.png?w=1200&quality=80&format=webp';
-import zoviqold from '../assets/zoviqold.png?w=1200&quality=80&format=webp';
+// Case study: an illustrative recreation of the old boxy site vs. the live redesign (top of the page).
+import zoviqBefore from '../assets/zoviq-before.png?w=1400&h=875&fit=cover&position=top&quality=80&format=webp';
+import zoviqAfter from '../assets/zoviq-full.png?w=1400&h=875&fit=cover&position=top&quality=82&format=webp';
 
 // Team portraits
 import akshar from '../assets/akshar.jpeg?w=640&quality=78&format=webp';
@@ -303,7 +303,7 @@ export const testimonials: Testimonial[] = [
       { label: 'Bounce Rate', value: '-65%' },
       { label: 'Brand Perception', value: '10x' }
     ],
-    beforeImage: zoviqold,
-    afterImage: zoviq
+    beforeImage: zoviqBefore,
+    afterImage: zoviqAfter
   }
 ];

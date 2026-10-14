@@ -4,7 +4,7 @@ import { useFinePointer, useReducedMotion } from '../../hooks/useMediaQuery';
 
 type State = 'default' | 'link' | 'view' | 'drag' | 'hidden';
 
-const RING_SCALE: Record<State, number> = { default: 1, link: 1.7, view: 2.4, drag: 2.4, hidden: 0.6 };
+const RING_SCALE: Record<State, number> = { default: 1, link: 1.6, view: 1.5, drag: 1.5, hidden: 0.6 };
 
 function resolve(target: EventTarget | null): { state: State; label: string } {
   if (!(target instanceof Element)) return { state: 'default', label: '' };
@@ -16,6 +16,27 @@ function resolve(target: EventTarget | null): { state: State; label: string } {
   if (target.closest('input, textarea, select')) return { state: 'hidden', label: '' };
   if (target.closest('a, button, [role="button"], [role="slider"], label')) return { state: 'link', label: '' };
   return { state: 'default', label: '' };
+}
+
+type Tone = 'light' | 'dark' | 'media';
+
+/**
+ * Which cursor colour reads against what's under the pointer: ink on light surfaces (paper, white,
+ * lime), white on dark ones, and an inverting blend over images/video where the colour varies.
+ * Runs once per element entered, not per frame.
+ */
+function toneAt(target: EventTarget | null): Tone {
+  if (!(target instanceof Element)) return 'light';
+  if (target.closest('img, video, canvas')) return 'media';
+  for (let el: Element | null = target; el; el = el.parentElement) {
+    const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
+    if (!m) continue;
+    const [r, g, b, a = 1] = m.map(Number);
+    if (a < 0.5) continue;
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return lum > 0.5 ? 'dark' : 'light';
+  }
+  return 'light';
 }
 
 /**
@@ -62,6 +83,7 @@ function CursorInner() {
     const onOver = (e: PointerEvent) => {
       const { state, label: text } = resolve(e.target);
       setState(state, text);
+      r.dataset.tone = toneAt(e.target);
     };
     const onLeave = () => {
       visible = false;
@@ -93,23 +115,26 @@ function CursorInner() {
   }, []);
 
   return (
+    // `data-tone` picks the colour (see toneAt). The media blend sits on the fixed root because a blend on
+    // the children would only mix with this layer's own stacking context.
     <div
       ref={root}
       aria-hidden
       data-state="default"
-      className="group pointer-events-none invisible fixed inset-0 opacity-0"
+      data-tone="light"
+      className="group pointer-events-none invisible fixed inset-0 opacity-0 data-[tone=media]:mix-blend-difference data-[state=drag]:mix-blend-normal data-[state=view]:mix-blend-normal"
       style={{ zIndex: 'var(--z-cursor)' }}
     >
       <div
         ref={ring}
-        className="absolute left-0 top-0 -ml-5 -mt-5 flex size-10 items-center justify-center rounded-full border border-white mix-blend-difference transition-[background-color,border-color] duration-200 ease-(--ease-out) group-data-[state=drag]:border-lime group-data-[state=drag]:bg-lime group-data-[state=drag]:mix-blend-normal group-data-[state=view]:border-lime group-data-[state=view]:bg-lime group-data-[state=view]:mix-blend-normal"
+        className="absolute left-0 top-0 -ml-5 -mt-5 flex size-10 items-center justify-center rounded-full border border-white group-data-[tone=dark]:border-ink transition-[background-color,border-color] duration-200 ease-(--ease-out) group-data-[state=drag]:border-lime/60 group-data-[state=drag]:bg-lime/45 group-data-[state=drag]:backdrop-blur-[3px] group-data-[state=view]:border-lime/60 group-data-[state=view]:bg-lime/45 group-data-[state=view]:backdrop-blur-[3px]"
       >
         <span
           ref={label}
-          className="text-[5px] font-semibold uppercase tracking-[0.08em] text-ink opacity-0 transition-opacity duration-200 group-data-[state=drag]:opacity-100 group-data-[state=view]:opacity-100"
+          className="text-[7px] font-semibold uppercase tracking-[0.06em] text-ink opacity-0 transition-opacity duration-200 group-data-[state=drag]:opacity-100 group-data-[state=view]:opacity-100"
         />
       </div>
-      <div ref={dot} className="absolute left-0 top-0 -ml-[3px] -mt-[3px] size-1.5 rounded-full bg-white mix-blend-difference" />
+      <div ref={dot} className="absolute left-0 top-0 -ml-[3px] -mt-[3px] size-1.5 rounded-full bg-white transition-colors duration-200 group-data-[tone=dark]:bg-ink" />
     </div>
   );
 }
