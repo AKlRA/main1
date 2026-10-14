@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ArrowUpRight, HandGrabbing } from '@phosphor-icons/react';
 import { projects } from '../../data';
-import { DESKTOP, MOBILE, type Artboard, type Box } from '../../data/santalum';
+import { DESKTOP, MOBILE, measureBoxes, type Artboard, type Box } from '../../data/santalum';
 import { gsap, useGSAP } from '../../motion/gsap';
 import { useIsMobile, useReducedMotion } from '../../hooks/useMediaQuery';
-import { bridgeEmbed } from './embedBridge';
+import { bridgeEmbed, type EmbedBridge } from './embedBridge';
 import stillDesktop from '../../assets/santalum-live-desktop.png?w=2800&quality=78&format=webp';
 import stillMobile from '../../assets/santalum-live-mobile.png?w=720&quality=80&format=webp';
 
@@ -38,7 +38,7 @@ const boxStyle = (b: Box): CSSProperties => ({ left: b.x, top: b.y, width: b.w, 
  * Clip path that shows the live page through its own layout boxes, each wiped left to right in
  * reading order (`pieces` 0..1), then opens from the centre to the whole page (`full` 0..1).
  */
-function maskPath(board: Artboard, order: Box[], pieces: number, full: number) {
+function maskPath(board: Artboard, height: number, order: Box[], pieces: number, full: number) {
   const rect = (x: number, y: number, w: number, h: number) => `M${x} ${y}h${w}v${h}h${-w}Z`;
   const step = 0.35;
   const span = (order.length - 1) * step + 1;
@@ -50,8 +50,8 @@ function maskPath(board: Artboard, order: Box[], pieces: number, full: number) {
     d += rect(b.x - pad, b.y - pad, (b.w + pad * 2) * p, b.h + pad * 2);
   });
   if (full > 0) {
-    const ix = ((1 - full) * board.w) / 2, iy = ((1 - full) * board.h) / 2;
-    d += rect(ix, iy, board.w - ix * 2, board.h - iy * 2);
+    const ix = ((1 - full) * board.w) / 2, iy = ((1 - full) * height) / 2;
+    d += rect(ix, iy, board.w - ix * 2, height - iy * 2);
   }
   return d ? `path('${d}')` : 'inset(50%)';
 }
@@ -92,17 +92,31 @@ export default function Assemble() {
   const outline = useRef<HTMLDivElement>(null);
   const reveal = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  const bridge = useRef<EmbedBridge | null>(null);
+  /** Artboard height in artboard px: the section's height at the width-fit scale. */
+  const artH = useRef(DESKTOP.h);
   const mobile = useIsMobile();
   const reduce = useReducedMotion();
   const [active, setActive] = useState(-1);
-  const [live, setLive] = useState(false);
+  const [isLiveNow, setLive] = useState(false);
   const [near, setNear] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const g = mobile ? GRID.mobile : GRID.desktop;
-  const board = mobile ? MOBILE : DESKTOP;
+  const saved = mobile ? MOBILE : DESKTOP;
+  // Outlines measured from the running embed (exact at any section size); saved ones until it loads.
+  const [measured, setMeasured] = useState<Box[] | null>(null);
+  const board = useMemo<Artboard>(() => (measured ? { ...saved, boxes: measured } : saved), [saved, measured]);
   const still = mobile ? stillMobile : stillDesktop;
-  const isLive = reduce || live;
+  const isLive = reduce || isLiveNow;
   const order = useMemo(() => [...board.boxes].sort((a, b) => a.y - b.y || a.x - b.x), [board]);
+  // The scroll timeline is built once; it reads the current outlines through these refs, so a
+  // re-measure never rebuilds it (a rebuild would drop the live state mid-interaction).
+  const live = useRef({ board, order, paint: () => {} });
+  useEffect(() => {
+    live.current.board = board;
+    live.current.order = order;
+    live.current.paint();
+  }, [board, order]);
 
   const tiles = useMemo(() => {
     const pool = mixedProjects();
@@ -140,20 +154,48 @@ export default function Assemble() {
     return () => { io.disconnect(); window.clearTimeout(delay); cancelIdle(handle); };
   }, [near]);
 
+  // The embed scrolls through its first two screens; beyond that, scrolling continues this page.
   useEffect(() => {
     const f = frame.current;
     if (!loaded || !f) return;
-    return bridgeEmbed(f, LIVE_URL);
+    const b = bridgeEmbed(f, LIVE_URL, 2);
+    bridge.current = b;
+    // Measure once the template's intro has fanned the deck out, and again whenever the frame resizes.
+    const win = f.contentWindow!;
+    let timer = 0;
+    const measure = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const doc = f.contentDocument;
+        if (doc && win.scrollY < 1) setMeasured(measureBoxes(doc));
+      }, 1200);
+    };
+    measure();
+    win.addEventListener('resize', measure);
+    return () => {
+      window.clearTimeout(timer);
+      win.removeEventListener('resize', measure);
+      b.dispose();
+      bridge.current = null;
+    };
   }, [loaded]);
 
-  // Fit the artboard to the stage (cover, anchored top-centre). Measured on resize, never per frame.
+  // Leaving the live state (scrolling back up into the zoom) puts the embed back on its first screen.
+  useEffect(() => {
+    if (!isLive) bridge.current?.reset();
+  }, [isLive]);
+
+  // Fit the artboard to the stage width; its height follows the stage, so the embed lays out at the
+  // section's real proportions and nothing is cropped at the sides. Measured on resize, never per frame.
   useEffect(() => {
     const el = stage.current, a = art.current;
     if (!el || !a) return;
     const fit = () => {
       const W = el.offsetWidth, H = el.offsetHeight;
-      const s = Math.max(W / board.w, H / board.h);
-      a.style.transform = `translate(${(W - board.w * s) / 2}px, 0px) scale(${s})`;
+      const s = W / board.w;
+      artH.current = H / s;
+      a.style.height = `${artH.current}px`;
+      a.style.transform = `scale(${s})`;
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -168,7 +210,7 @@ export default function Assemble() {
         const section = root.current!, st = stage.current!, ring = outline.current!, mask = reveal.current!;
         const tileEls = gsap.utils.toArray<HTMLElement>('.as-tile');
         const sMax = 1 / g.f0;
-        const proxy = { f: g.f0, pieces: 0, full: 0 };
+        const proxy = { f: g.f0, outlines: 0, pieces: 0, full: 0, fade: 0 };
         let word = -1, wasLive = false;
 
         const applyZoom = () => {
@@ -184,14 +226,23 @@ export default function Assemble() {
             gsap.set(el, { x: tile.ox * W * (s * k - 1), y: tile.oy * H * (s * k - 1), scale: s, opacity: 0.6 * (1 - Math.min(1, t * 1.3)) });
           });
         };
-        const applyMask = () => {
-          mask.style.clipPath = proxy.full >= 1 ? 'none' : maskPath(board, order, proxy.pieces, proxy.full);
+        // Outlines and mask are painted from the current boxes on every update (and after a re-measure).
+        const paint = () => {
+          const { board: bd, order: od } = live.current;
+          mask.style.clipPath = proxy.full >= 1 ? 'none' : maskPath(bd, artH.current, od, proxy.pieces, proxy.full);
+          // At rest the tile already reads as a blueprint (0.5); "Detail" staggers the outlines to full.
+          const els = section.querySelectorAll<HTMLElement>('.wf-box');
+          const step = 0.6, spanN = Math.max(1, (els.length - 1) * step + 1);
+          els.forEach((el, i) => {
+            const p = Math.min(1, Math.max(0, proxy.outlines * spanN - i * step));
+            el.style.opacity = String((0.5 + 0.5 * p) * (1 - proxy.fade));
+          });
+          const grid = section.querySelector<HTMLElement>('.wf-grid');
+          if (grid) grid.style.opacity = String(1 - proxy.fade);
         };
-
-        // At rest the centre tile already reads as a blueprint; "Detail" brings the outlines to full strength.
-        gsap.set('.wf-box', { opacity: 0.5 });
+        live.current.paint = paint;
         applyZoom();
-        applyMask();
+        paint();
 
         const tl = gsap.timeline({
           defaults: { ease: 'none' },
@@ -215,22 +266,23 @@ export default function Assemble() {
         });
         const span = (r: number[]) => ({ at: r[0], duration: r[1] - r[0] });
         tl.to(proxy, { f: 1, duration: T.zoomEnd, ease: 'power1.inOut', onUpdate: applyZoom }, 0)
-          .to('.wf-box', { opacity: 1, duration: 0.05, stagger: { amount: span(T.outlines).duration - 0.05 } }, T.outlines[0])
-          .to(proxy, { pieces: 1, duration: span(T.pieces).duration, onUpdate: applyMask }, T.pieces[0])
-          .to(proxy, { full: 1, duration: span(T.full).duration, ease: 'power2.in', onUpdate: applyMask }, T.full[0])
-          .to(['.wf-box', '.wf-grid'], { opacity: 0, duration: 0.08 }, T.full[1] - 0.08)
+          .to(proxy, { outlines: 1, duration: span(T.outlines).duration, onUpdate: paint }, T.outlines[0])
+          .to(proxy, { pieces: 1, duration: span(T.pieces).duration, onUpdate: paint }, T.pieces[0])
+          .to(proxy, { full: 1, duration: span(T.full).duration, ease: 'power2.in', onUpdate: paint }, T.full[0])
+          .to(proxy, { fade: 1, duration: 0.08, onUpdate: paint }, T.full[1] - 0.08)
           .to({}, { duration: 1 - T.full[1] });
         return () => {
           // Clear only what GSAP set: 'all' would also wipe the inline size/position React rendered.
           gsap.set([st, ring], { clearProps: 'transform,borderRadius,borderWidth,opacity' });
           mask.style.clipPath = '';
+          live.current.paint = () => {};
           setLive(false);
           setActive(-1);
         };
       });
       return () => mm.revert();
     },
-    { scope: root, dependencies: [mobile, tiles, board, order] },
+    { scope: root, dependencies: [mobile, tiles] },
   );
 
   return (
@@ -280,7 +332,7 @@ export default function Assemble() {
 
           {/* The running page (a still stands in until it loads), shown through the reveal mask. */}
           <div ref={reveal} className="absolute inset-0" style={reduce ? undefined : { clipPath: 'inset(50%)' }}>
-            <img src={still} alt="" className="absolute inset-0 size-full" />
+            <img src={still} alt="" className="absolute inset-0 size-full object-cover object-top" />
             {near && (
               <iframe
                 ref={frame}
@@ -291,7 +343,7 @@ export default function Assemble() {
                 className={`absolute inset-0 size-full border-0 transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${
                   isLive ? '' : 'pointer-events-none'
                 }`}
-                style={{ width: board.w, height: board.h }}
+                style={{ width: board.w }}
               />
             )}
           </div>
@@ -321,7 +373,9 @@ export default function Assemble() {
         {isLive ? (
           <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-ink/85 p-1.5 pl-4 text-sm text-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md">
             <HandGrabbing size={16} weight="duotone" className="mr-1.5 shrink-0 text-lime" />
-            <span className="mr-2 whitespace-nowrap">Live site. Drag the cards.</span>
+            <span className="mr-2 whitespace-nowrap">
+              Live site.<span className="max-md:hidden"> Drag the cards, scroll inside.</span>
+            </span>
             <a
               href={LIVE_URL}
               target="_blank"

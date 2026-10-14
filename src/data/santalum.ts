@@ -59,3 +59,29 @@ export const MOBILE: Artboard = {
     { k: 'text', x: 250, y: 760, w: 167, h: 30 },
   ],
 };
+/** What the wireframe outlines: the same selectors the saved boxes above were measured from. */
+const MEASURE: [string, BoxKind][] = [
+  ['.logo__mark', 'shape'], ['.logo__date', 'text'], ['.pillnav', 'shape'], ['.pillnav a', 'text'],
+  ['.top__tools > *', 'shape'], ['.hero h1 .ln > span', 'text'], ['.hero__title .honey-btn', 'shape'],
+  ['.card.is-top', 'media'], ['.deck__ctrl > *', 'shape'], ['[data-topics] button', 'text'],
+  ['.infocus small', 'text'], ['.infocus a', 'text'], ['.joinus small', 'text'], ['.joinus a', 'shape'],
+];
+
+/** Measure the running template's first screen, in its own viewport px (= artboard px). */
+export function measureBoxes(doc: Document): Box[] {
+  const win = doc.defaultView!;
+  const W = win.innerWidth, H = win.innerHeight;
+  const boxes: Box[] = [];
+  for (const [sel, k] of MEASURE) {
+    doc.querySelectorAll(sel).forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const y = r.top + win.scrollY;
+      if (r.width < 2 || r.height < 2 || y + r.height <= 0 || y >= H || r.right <= 0 || r.left >= W) return;
+      const cs = win.getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none') return;
+      const rad = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, r.height / 2);
+      boxes.push({ k, x: Math.round(r.left), y: Math.round(y), w: Math.round(r.width), h: Math.round(r.height), ...(rad ? { r: Math.round(rad) } : {}) });
+    });
+  }
+  return boxes;
+}
