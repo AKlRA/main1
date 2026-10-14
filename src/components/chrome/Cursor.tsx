@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { gsap } from '../../motion/gsap';
+import { gsap, ScrollTrigger } from '../../motion/gsap';
 import { useFinePointer, useReducedMotion } from '../../hooks/useMediaQuery';
 
 type State = 'default' | 'link' | 'view' | 'drag' | 'hidden';
 
-const RING_SCALE: Record<State, number> = { default: 1, link: 1.6, view: 1.5, drag: 1.5, hidden: 0.6 };
+// View/drag bubbles stay close to the resting ring so they label the target without covering it.
+const RING_SCALE: Record<State, number> = { default: 1, link: 1.4, view: 1.25, drag: 1.25, hidden: 0.6 };
 
 function resolve(target: EventTarget | null): { state: State; label: string } {
   if (!(target instanceof Element)) return { state: 'default', label: '' };
@@ -23,7 +24,7 @@ type Tone = 'light' | 'dark' | 'media';
 /**
  * Which cursor colour reads against what's under the pointer: ink on light surfaces (paper, white,
  * lime), white on dark ones, and an inverting blend over images/video where the colour varies.
- * Runs once per element entered, not per frame.
+ * Runs when the pointer enters an element and when the page scrolls under a still pointer.
  */
 function toneAt(target: EventTarget | null): Tone {
   if (!(target instanceof Element)) return 'light';
@@ -59,6 +60,7 @@ function CursorInner() {
     const dotY = gsap.quickTo(dotEl, 'y', { duration: 0.08, ease: 'none' });
     let current: State = 'default';
     let visible = false;
+    let lastX = -1, lastY = -1;
 
     const setState = (next: State, text: string) => {
       if (next === current && labelEl.textContent === text) return;
@@ -77,14 +79,30 @@ function CursorInner() {
         gsap.set([ringEl, dotEl], { x: e.clientX, y: e.clientY });
         gsap.to(r, { autoAlpha: 1, duration: 0.2 });
       }
+      lastX = e.clientX; lastY = e.clientY;
       ringX(e.clientX); ringY(e.clientY);
       dotX(e.clientX); dotY(e.clientY);
     };
-    const onOver = (e: PointerEvent) => {
-      const { state, label: text } = resolve(e.target);
+    const inspect = (target: EventTarget | null) => {
+      const { state, label: text } = resolve(target);
       setState(state, text);
-      r.dataset.tone = toneAt(e.target);
+      r.dataset.tone = toneAt(target);
     };
+    const onOver = (e: PointerEvent) => inspect(e.target);
+    // Scrolling moves new content under a still pointer without firing pointerover, so re-check
+    // what is under it (at most once per frame) whenever the page scrolls.
+    let pending = 0;
+    const scrollWatch = ScrollTrigger.create({
+      start: 0,
+      end: 'max',
+      onUpdate: () => {
+        if (pending || !visible || lastX < 0) return;
+        pending = requestAnimationFrame(() => {
+          pending = 0;
+          inspect(document.elementFromPoint(lastX, lastY));
+        });
+      },
+    });
     const onLeave = () => {
       visible = false;
       gsap.to(r, { autoAlpha: 0, duration: 0.2 });
@@ -109,6 +127,8 @@ function CursorInner() {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('keydown', onKey);
       document.documentElement.removeEventListener('pointerleave', onLeave);
+      scrollWatch.kill();
+      cancelAnimationFrame(pending);
       html.classList.remove('has-cursor');
       gsap.killTweensOf([ringEl, dotEl, r]);
     };
@@ -127,11 +147,11 @@ function CursorInner() {
     >
       <div
         ref={ring}
-        className="absolute left-0 top-0 -ml-5 -mt-5 flex size-10 items-center justify-center rounded-full border border-white group-data-[tone=dark]:border-ink transition-[background-color,border-color] duration-200 ease-(--ease-out) group-data-[state=drag]:border-lime/60 group-data-[state=drag]:bg-lime/45 group-data-[state=drag]:backdrop-blur-[3px] group-data-[state=view]:border-lime/60 group-data-[state=view]:bg-lime/45 group-data-[state=view]:backdrop-blur-[3px]"
+        className="absolute left-0 top-0 -ml-5 -mt-5 flex size-10 items-center justify-center rounded-full border border-white group-data-[tone=dark]:border-ink transition-[background-color,border-color] duration-200 ease-(--ease-out) group-data-[state=drag]:border-lime/70 group-data-[state=drag]:bg-lime/55 group-data-[state=drag]:backdrop-blur-[2px] group-data-[state=view]:border-lime/70 group-data-[state=view]:bg-lime/55 group-data-[state=view]:backdrop-blur-[2px]"
       >
         <span
           ref={label}
-          className="text-[7px] font-semibold uppercase tracking-[0.06em] text-ink opacity-0 transition-opacity duration-200 group-data-[state=drag]:opacity-100 group-data-[state=view]:opacity-100"
+          className="text-[7.5px] font-bold uppercase tracking-[0.04em] text-ink opacity-0 transition-opacity duration-200 group-data-[state=drag]:opacity-100 group-data-[state=view]:opacity-100"
         />
       </div>
       <div ref={dot} className="absolute left-0 top-0 -ml-[3px] -mt-[3px] size-1.5 rounded-full bg-white transition-colors duration-200 group-data-[tone=dark]:bg-ink" />
