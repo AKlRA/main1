@@ -44,27 +44,109 @@ function roundRect(x: number, y: number, w: number, h: number, r: number) {
   );
 }
 
-/** Padding and corner radius of each revealed piece: shapes keep their own curve, text gets a soft one. */
+interface Rect { x: number; y: number; w: number; h: number }
+
+/** Shapes and the card keep their own outline (no ring of background around them). */
 function pieceShape(b: Box) {
-  if (b.k === 'media') return { pad: 14, r: (b.r ?? 18) + 14 };
-  if (b.k === 'shape') return { pad: 3, r: (b.r ?? 8) + 3 };
-  return { pad: 6, r: 12 };
+  if (b.k === 'media') return { pad: 12, r: (b.r ?? 18) + 12 };
+  return { pad: 0, r: b.r ?? 6 };
+}
+const TEXT_PAD = { x: 12, y: 9 };
+const TEXT_RADIUS = 14;
+
+/**
+ * Text pieces merge into die-cut shapes: neighbours on one line join into a row, and rows stacked on
+ * top of each other join into one outline. Every corner of that outline, inner ones included, is
+ * rounded, so stepped stacks read as one soft sticker instead of boxes with square notches.
+ */
+function textShapes(rects: Rect[]) {
+  // 1. Same-line neighbours become one row.
+  const rows: Rect[] = [];
+  [...rects].sort((a, b) => a.y - b.y || a.x - b.x).forEach((r) => {
+    const row = rows.find((o) => Math.abs(o.y + o.h / 2 - (r.y + r.h / 2)) < 6 && r.x <= o.x + o.w + 28 && r.x + r.w >= o.x - 28);
+    if (!row) { rows.push({ ...r }); return; }
+    const x2 = Math.max(row.x + row.w, r.x + r.w), y2 = Math.max(row.y + row.h, r.y + r.h);
+    row.x = Math.min(row.x, r.x); row.y = Math.min(row.y, r.y); row.w = x2 - row.x; row.h = y2 - row.y;
+  });
+  // 2. Rows that touch vertically and overlap horizontally become one stack.
+  const stacks: Rect[][] = [];
+  rows.sort((a, b) => a.y - b.y).forEach((r) => {
+    const st = stacks.find((s) => {
+      const last = s[s.length - 1];
+      // Small gaps (tight display leading) still join: the outline bridges them at their midline.
+      return r.y <= last.y + last.h + 16 && r.x < last.x + last.w && r.x + r.w > last.x;
+    });
+    if (st) st.push(r); else stacks.push([r]);
+  });
+  return stacks.map((s) => roundedPolygon(stackOutline(s), TEXT_RADIUS)).join('');
+}
+
+/** Clockwise outline of a top-to-bottom stack of rows, stepping at the middle of each overlap. */
+function stackOutline(rows: Rect[]) {
+  const cut = rows.slice(0, -1).map((r, i) => (r.y + r.h + rows[i + 1].y) / 2);
+  const pts: [number, number][] = [[rows[0].x, rows[0].y], [rows[0].x + rows[0].w, rows[0].y]];
+  rows.forEach((r, i) => {
+    const bottom = i < cut.length ? cut[i] : r.y + r.h;
+    pts.push([r.x + r.w, bottom]);
+    if (i < cut.length) pts.push([rows[i + 1].x + rows[i + 1].w, bottom]);
+  });
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    const bottom = i < cut.length ? cut[i] : r.y + r.h;
+    const top = i > 0 ? cut[i - 1] : r.y;
+    pts.push([r.x, bottom]);
+    if (i > 0) pts.push([r.x, top], [rows[i - 1].x, top]);
+  }
+  // Drop repeated and collinear points (rows with equal edges).
+  const out: [number, number][] = [];
+  pts.forEach((p) => {
+    const a = out[out.length - 1];
+    if (a && Math.abs(a[0] - p[0]) < 0.5 && Math.abs(a[1] - p[1]) < 0.5) return;
+    out.push(p);
+  });
+  return out.filter((p, i) => {
+    const a = out[(i - 1 + out.length) % out.length], b = out[(i + 1) % out.length];
+    return !((Math.abs(a[0] - p[0]) < 0.5 && Math.abs(b[0] - p[0]) < 0.5) || (Math.abs(a[1] - p[1]) < 0.5 && Math.abs(b[1] - p[1]) < 0.5));
+  });
+}
+
+/** Path through a polygon with every vertex rounded (radius clamped to half of each adjacent edge). */
+function roundedPolygon(pts: [number, number][], radius: number) {
+  const n = pts.length;
+  if (n < 3) return '';
+  const f = (v: number) => Math.round(v * 10) / 10;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const p = pts[(i - 1 + n) % n], v = pts[i], q = pts[(i + 1) % n];
+    const lp = Math.hypot(p[0] - v[0], p[1] - v[1]), lq = Math.hypot(q[0] - v[0], q[1] - v[1]);
+    const r = Math.min(radius, lp / 2, lq / 2);
+    const a = [v[0] + ((p[0] - v[0]) / lp) * r, v[1] + ((p[1] - v[1]) / lp) * r];
+    const b = [v[0] + ((q[0] - v[0]) / lq) * r, v[1] + ((q[1] - v[1]) / lq) * r];
+    d += `${i === 0 ? 'M' : 'L'}${f(a[0])} ${f(a[1])}Q${f(v[0])} ${f(v[1])} ${f(b[0])} ${f(b[1])}`;
+  }
+  return d + 'Z';
 }
 
 /**
- * Clip path that shows the live page through its own layout boxes, each wiped left to right in
+ * Clip path that shows the live page through its own layout, each piece wiped left to right in
  * reading order (`pieces` 0..1), then opens from the centre to the whole page (`full` 0..1).
  */
 function maskPath(board: Artboard, height: number, order: Box[], pieces: number, full: number) {
   const step = 0.35;
   const span = (order.length - 1) * step + 1;
   let d = '';
+  const text: Rect[] = [];
   order.forEach((b, i) => {
     const p = Math.min(1, Math.max(0, pieces * span - i * step));
     if (p <= 0) return;
+    if (b.k === 'text') {
+      text.push({ x: b.x - TEXT_PAD.x, y: b.y - TEXT_PAD.y, w: (b.w + TEXT_PAD.x * 2) * p, h: b.h + TEXT_PAD.y * 2 });
+      return;
+    }
     const { pad, r } = pieceShape(b);
     d += roundRect(b.x - pad, b.y - pad, (b.w + pad * 2) * p, b.h + pad * 2, r);
   });
+  d += textShapes(text.filter((r) => r.w > 1));
   if (full > 0) {
     const ix = ((1 - full) * board.w) / 2, iy = ((1 - full) * height) / 2;
     d += roundRect(ix, iy, board.w - ix * 2, height - iy * 2, 28 * (1 - full));
@@ -247,11 +329,15 @@ export default function Assemble() {
           const { board: bd, order: od } = live.current;
           mask.style.clipPath = proxy.full >= 1 ? 'none' : maskPath(bd, artH.current, od, proxy.pieces, proxy.full);
           // At rest the tile already reads as a blueprint (0.5); "Detail" staggers the outlines to full.
+          // Each outline then fades out as its own piece of the live page is revealed.
           const els = section.querySelectorAll<HTMLElement>('.wf-box');
           const step = 0.6, spanN = Math.max(1, (els.length - 1) * step + 1);
+          const pStep = 0.35, pSpan = (od.length - 1) * pStep + 1;
           els.forEach((el, i) => {
             const p = Math.min(1, Math.max(0, proxy.outlines * spanN - i * step));
-            el.style.opacity = String((0.5 + 0.5 * p) * (1 - proxy.fade));
+            const j = od.indexOf(bd.boxes[i]);
+            const shown = j < 0 ? 0 : Math.min(1, Math.max(0, proxy.pieces * pSpan - j * pStep));
+            el.style.opacity = String((0.5 + 0.5 * p) * (1 - shown) * (1 - proxy.fade));
           });
           const grid = section.querySelector<HTMLElement>('.wf-grid');
           if (grid) grid.style.opacity = String(1 - proxy.fade);
