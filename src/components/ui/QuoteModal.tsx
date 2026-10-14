@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Phone, Sparkles, CheckCircle2 } from 'lucide-react';
-import { premiumEase } from '../../lib/utils';
-
-interface QuoteModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowUpRight, Check, EnvelopeSimple, WhatsappLogo, X } from '@phosphor-icons/react';
+import { CONTACT, QUOTE_ENDPOINT, onOpenQuote } from '../../data/contact';
+import { EASE } from '../../motion/tokens';
+import { useScrollApi } from '../../motion/scrollContext';
+import { useIsMobile, useReducedMotion } from '../../hooks/useMediaQuery';
 
 const services = [
   'Website / Web App',
@@ -16,189 +14,206 @@ const services = [
   'Other / Consultation',
 ];
 
-const WHATSAPP_NUMBER = "918277630021";
-const GOOGLE_SHEETS_SCRIPT_URL = "YOUR_GOOGLE_SCRIPT_URL_HERE";
+type Fields = { name: string; email: string; phone: string; message: string };
+type Errors = Partial<Record<keyof Fields, string>>;
+type Status = 'idle' | 'sending' | 'sent' | 'whatsapp' | 'error';
 
-const QuoteModal: React.FC<QuoteModalProps> = ({ isOpen, onClose }) => {
-  const [selectedService, setSelectedService] = useState<string>('Website / Web App');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+const EMPTY: Fields = { name: '', email: '', phone: '', message: '' };
 
-  // Close on Escape key
+function validate(f: Fields): Errors {
+  const e: Errors = {};
+  if (!f.name.trim()) e.name = 'Add your name so we know who to reply to.';
+  if (!f.email.trim()) e.email = 'Add an email address.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'That email address looks incomplete.';
+  return e;
+}
+
+function summary(service: string, f: Fields) {
+  return [
+    'Hi Axoraa, I want to talk about a project.',
+    '',
+    `Service: ${service}`,
+    `Name: ${f.name}`,
+    `Email: ${f.email}`,
+    f.phone && `Phone: ${f.phone}`,
+    f.message && `Details: ${f.message}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export default function QuoteModal() {
+  const [open, setOpen] = useState(false);
+  const [service, setService] = useState(services[0]);
+  const [fields, setFields] = useState<Fields>(EMPTY);
+  const [errors, setErrors] = useState<Errors>({});
+  const [status, setStatus] = useState<Status>('idle');
+  const { lock, unlock } = useScrollApi();
+  const mobile = useIsMobile();
+  const reduce = useReducedMotion();
+  const firstField = useRef<HTMLInputElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+
+  useEffect(() => onOpenQuote(() => {
+    returnFocus.current = document.activeElement as HTMLElement | null;
+    setOpen(true);
+  }), []);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Lock body scroll when open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    if (!open) return;
+    lock();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    const t = window.setTimeout(() => firstField.current?.focus(), 60);
     return () => {
-      document.body.style.overflow = 'unset';
+      unlock();
+      window.removeEventListener('keydown', onKey);
+      window.clearTimeout(t);
+      returnFocus.current?.focus?.();
     };
-  }, [isOpen]);
+  }, [open, lock, unlock]);
 
-  const getWhatsAppLink = () => {
-    const text = encodeURIComponent(
-      `Hi Axoraa Team!\n\nI want to connect regarding a project.\n\n*Service:* ${selectedService}\n*Name:* ${name || 'Prospective Client'}\n*Email:* ${email || 'N/A'}\n*Phone:* ${phone || 'N/A'}\n*Project Details:* ${message || 'Looking forward to discussing!'}`
-    );
-    return `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
+  const close = () => setOpen(false);
+  const set = (key: keyof Fields) => (e: { target: { value: string } }) => {
+    setFields((f) => ({ ...f, [key]: e.target.value }));
+    if (errors[key]) setErrors((er) => ({ ...er, [key]: undefined }));
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const text = summary(service, fields);
+  const whatsappHref = `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`;
+  const mailHref = `mailto:${CONTACT.email}?subject=${encodeURIComponent(`Project enquiry: ${service}`)}&body=${encodeURIComponent(text)}`;
+
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitStatus('idle');
-
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('email', email);
-    formData.append('phone', phone);
-    formData.append('service', selectedService);
-    formData.append('message', message);
-    formData.append('source', 'Get Quote / Connect Modal');
-
+    const found = validate(fields);
+    setErrors(found);
+    if (Object.keys(found).length) {
+      document.getElementById(`${titleId}-${Object.keys(found)[0]}`)?.focus();
+      return;
+    }
+    if (!QUOTE_ENDPOINT) {
+      window.open(whatsappHref, '_blank', 'noopener,noreferrer');
+      setStatus('whatsapp');
+      return;
+    }
+    setStatus('sending');
     try {
-      if (GOOGLE_SHEETS_SCRIPT_URL && GOOGLE_SHEETS_SCRIPT_URL !== "YOUR_GOOGLE_SCRIPT_URL_HERE") {
-        await fetch(GOOGLE_SHEETS_SCRIPT_URL, {
-          method: 'POST',
-          body: formData,
-        });
-      }
-      setSubmitStatus('success');
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 500);
-    } catch (err) {
-      console.error('Submission error:', err);
-      setSubmitStatus('success');
-      setIsSubmitting(false);
+      const body = new FormData();
+      Object.entries({ ...fields, service, source: 'Quote modal' }).forEach(([k, v]) => body.append(k, v));
+      const res = await fetch(QUOTE_ENDPOINT, { method: 'POST', body });
+      setStatus(res.ok ? 'sent' : 'error');
+    } catch {
+      setStatus('error');
     }
   };
 
-  const resetForm = () => {
-    setName('');
-    setEmail('');
-    setPhone('');
-    setMessage('');
-    setSubmitStatus('idle');
+  const reset = () => {
+    setFields(EMPTY);
+    setErrors({});
+    setStatus('idle');
   };
+
+  const panelMotion = reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.2 } }
+    : mobile
+      ? {
+          initial: { transform: 'translateY(100%)' },
+          animate: { transform: 'translateY(0%)' },
+          exit: { transform: 'translateY(100%)' },
+          transition: { duration: 0.5, ease: EASE.drawer },
+        }
+      : {
+          initial: { opacity: 0, transform: 'translateY(16px) scale(0.96)' },
+          animate: { opacity: 1, transform: 'translateY(0px) scale(1)' },
+          exit: { opacity: 0, transform: 'translateY(8px) scale(0.98)', transition: { duration: 0.18, ease: EASE.out } },
+          transition: { duration: 0.28, ease: EASE.out },
+        };
+
+  const input =
+    'w-full rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-white placeholder:text-white/40 transition-colors duration-200 hover:border-white/30 focus:border-lime focus:outline-none aria-[invalid=true]:border-lime';
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          {/* Backdrop */}
+    <AnimatePresence onExitComplete={reset}>
+      {open && (
+        <div className="fixed inset-0 flex items-end justify-center md:items-center md:p-6" style={{ zIndex: 'var(--z-modal)' }}>
           <motion.div
+            className="absolute inset-0 bg-ink/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/90 backdrop-blur-md cursor-pointer"
+            transition={{ duration: 0.25, ease: EASE.out }}
+            onClick={close}
           />
-
-          {/* Modal Container: Pure Black theme */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 30 }}
-            transition={{ ease: premiumEase, duration: 0.4 }}
-            className="relative w-full max-w-lg bg-[#0a0a0a] border border-white/15 rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.95)] overflow-hidden z-10 my-auto text-white"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            {...panelMotion}
+            className="relative flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-ink ring-1 ring-white/12 md:max-w-xl md:rounded-[1.75rem]"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
           >
-            {/* Ambient Top Glow */}
-            <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-[#CCFF00] to-transparent pointer-events-none" />
-
-            {/* Header */}
-            <div className="p-6 md:p-8 pb-4 flex items-start justify-between border-b border-white/10 bg-black/40">
+            <div className="mx-auto mt-3 h-1 w-10 rounded-full bg-white/20 md:hidden" aria-hidden />
+            <header className="flex items-start justify-between gap-6 px-6 pb-5 pt-5 md:px-9 md:pt-9">
               <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#CCFF00] animate-pulse" />
-                  <span className="text-xs font-mono uppercase tracking-widest text-[#CCFF00]">
-                    Connect with Team
-                  </span>
-                </div>
-                <h3 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
-                  Let's Build Together
-                </h3>
-                <p className="text-gray-400 text-xs md:text-sm mt-1">
-                  Share your basic details and our engineers will get in touch promptly.
+                <h2 id={titleId} className="text-display text-3xl md:text-4xl">Let&apos;s build together</h2>
+                <p className="mt-2 max-w-sm text-sm text-white/60">
+                  Tell us what you need. An engineer replies within one working day.
                 </p>
               </div>
               <button
-                onClick={onClose}
-                className="p-2.5 rounded-full bg-white/5 hover:bg-white/15 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0 ml-4"
-                aria-label="Close modal"
+                type="button"
+                onClick={close}
+                aria-label="Close"
+                className="pressable grid size-11 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/70 transition-colors duration-200 hover:bg-white/12 hover:text-white"
               >
-                <X size={20} />
+                <X size={18} weight="bold" />
               </button>
-            </div>
+            </header>
 
-            {/* Content Body */}
-            <div className="p-6 md:p-8 max-h-[75vh] overflow-y-auto space-y-5 bg-[#0a0a0a]">
-              {submitStatus === 'success' ? (
-                <div className="text-center py-10 px-2">
-                  <div className="w-16 h-16 bg-[#CCFF00]/20 text-[#CCFF00] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#CCFF00]/30">
-                    <CheckCircle2 size={32} />
+            <div data-lenis-prevent className="overflow-y-auto px-6 pb-7 md:px-9 md:pb-9">
+              {status === 'sent' || status === 'whatsapp' ? (
+                <div className="py-6">
+                  <div className="mb-5 grid size-12 place-items-center rounded-full bg-lime text-ink">
+                    <Check size={22} weight="bold" />
                   </div>
-                  <h4 className="text-2xl font-bold uppercase tracking-tight text-white mb-2">
-                    Details Received!
-                  </h4>
-                  <p className="text-gray-400 text-sm max-w-sm mx-auto mb-8">
-                    Thanks for reaching out! We will review your project and connect with you at <span className="text-[#CCFF00]">{email || 'your email'}</span>.
+                  <h3 className="text-display text-2xl">
+                    {status === 'sent' ? 'Request received.' : 'Finish in WhatsApp.'}
+                  </h3>
+                  <p className="mt-3 max-w-md text-white/65">
+                    {status === 'sent'
+                      ? `Thanks, ${fields.name.split(' ')[0]}. We will reply to ${fields.email} within one working day.`
+                      : 'We opened WhatsApp with your details filled in. Press send there and we will pick it up.'}
                   </p>
-
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <a
-                      href={getWhatsAppLink()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-3 px-6 bg-[#25D366] text-black font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-[#25D366]/90 transition-colors"
-                    >
-                      <Phone size={16} /> Chat on WhatsApp
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    {status === 'whatsapp' && (
+                      <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="pressable inline-flex items-center gap-2 rounded-full bg-lime px-5 py-3 text-sm font-semibold text-ink">
+                        <WhatsappLogo size={18} weight="fill" /> Open WhatsApp again
+                      </a>
+                    )}
+                    <a href={mailHref} className="pressable inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-5 py-3 text-sm font-semibold text-white hover:bg-white/15">
+                      <EnvelopeSimple size={18} /> Email instead
                     </a>
-                    <button
-                      onClick={() => {
-                        resetForm();
-                        onClose();
-                      }}
-                      className="py-3 px-6 bg-white/10 text-white font-bold uppercase tracking-wider text-xs rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                      Close Window
+                    <button type="button" onClick={close} className="pressable rounded-full px-5 py-3 text-sm font-semibold text-white/70 hover:text-white">
+                      Close
                     </button>
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Service Interest */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-widest text-gray-400 mb-2.5">
-                      Interested In
-                    </label>
+                <form onSubmit={submit} noValidate className="flex flex-col gap-5">
+                  <fieldset>
+                    <legend className="mb-3 text-sm font-medium text-white/70">What do you need?</legend>
                     <div className="flex flex-wrap gap-2">
                       {services.map((svc) => {
-                        const isSelected = selectedService === svc;
+                        const on = svc === service;
                         return (
                           <button
-                            type="button"
                             key={svc}
-                            onClick={() => setSelectedService(svc)}
-                            className={`text-xs px-3 py-2 rounded-xl border font-medium transition-all duration-200 cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#CCFF00] text-black border-[#CCFF00] font-bold shadow-[0_0_12px_rgba(204,255,0,0.25)]'
-                                : 'bg-black border-white/10 text-gray-300 hover:border-white/30 hover:text-white'
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => setService(svc)}
+                            className={`pressable min-h-11 rounded-full px-4 text-sm transition-colors duration-200 ${
+                              on ? 'bg-lime font-semibold text-ink' : 'bg-white/[0.05] text-white/75 ring-1 ring-white/12 hover:text-white hover:ring-white/30'
                             }`}
                           >
                             {svc}
@@ -206,97 +221,62 @@ const QuoteModal: React.FC<QuoteModalProps> = ({ isOpen, onClose }) => {
                         );
                       })}
                     </div>
+                  </fieldset>
+
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor={`${titleId}-name`} className="text-sm font-medium text-white/70">Name</label>
+                    <input ref={firstField} id={`${titleId}-name`} autoComplete="name" value={fields.name} onChange={set('name')} aria-invalid={!!errors.name} aria-describedby={errors.name ? `${titleId}-name-err` : undefined} className={input} />
+                    {errors.name && <p id={`${titleId}-name-err`} className="text-sm text-lime">{errors.name}</p>}
                   </div>
 
-                  {/* Primary Contact Details */}
-                  <div className="space-y-3 pt-1">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Your Name *"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-black border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] transition-colors"
-                      />
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor={`${titleId}-email`} className="text-sm font-medium text-white/70">Email</label>
+                      <input id={`${titleId}-email`} type="email" autoComplete="email" autoCapitalize="none" value={fields.email} onChange={set('email')} aria-invalid={!!errors.email} aria-describedby={errors.email ? `${titleId}-email-err` : undefined} className={input} />
+                      {errors.email && <p id={`${titleId}-email-err`} className="text-sm text-lime">{errors.email}</p>}
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        type="email"
-                        placeholder="Email Address *"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-black border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] transition-colors"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Phone / WhatsApp"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-black border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] transition-colors"
-                      />
-                    </div>
-
-                    <div>
-                      <textarea
-                        rows={3}
-                        placeholder="Briefly tell us about your project or goals..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        className="w-full bg-black border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] transition-colors resize-none"
-                      />
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor={`${titleId}-phone`} className="text-sm font-medium text-white/70">
+                        Phone or WhatsApp <span className="text-white/45">(optional)</span>
+                      </label>
+                      <input id={`${titleId}-phone`} type="tel" inputMode="tel" autoComplete="tel" value={fields.phone} onChange={set('phone')} className={input} />
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor={`${titleId}-message`} className="text-sm font-medium text-white/70">
+                      Project details <span className="text-white/45">(optional)</span>
+                    </label>
+                    <textarea id={`${titleId}-message`} rows={3} value={fields.message} onChange={set('message')} placeholder="Goals, timeline, links to anything you like" className={`${input} resize-none`} />
+                  </div>
+
+                  {status === 'error' && (
+                    <p role="alert" className="text-sm text-lime">
+                      The request didn&apos;t go through. Try again, or send it on WhatsApp.
+                    </p>
+                  )}
+
+                  <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center">
                     <button
                       type="submit"
-                      disabled={isSubmitting}
-                      className="flex-1 py-3.5 px-6 bg-[#CCFF00] hover:bg-[#b8e600] text-black font-bold uppercase tracking-widest text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50 cursor-pointer shadow-[0_0_20px_rgba(204,255,0,0.3)]"
+                      disabled={status === 'sending'}
+                      className="pressable inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-lime px-6 text-sm font-semibold text-ink transition-opacity disabled:opacity-60"
                     >
-                      {isSubmitting ? (
-                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      {QUOTE_ENDPOINT ? (
+                        <>{status === 'sending' ? 'Sending' : 'Send request'} <ArrowUpRight size={16} weight="bold" /></>
                       ) : (
-                        <>
-                          <Send size={16} /> Submit Details
-                        </>
+                        <><WhatsappLogo size={18} weight="fill" /> Send on WhatsApp</>
                       )}
                     </button>
-
-                    <a
-                      href={getWhatsAppLink()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-3.5 px-5 bg-[#25D366]/10 hover:bg-[#25D366] text-[#25D366] hover:text-black border border-[#25D366]/30 font-bold uppercase tracking-widest text-xs rounded-xl flex items-center justify-center gap-2 transition-colors duration-300"
-                    >
-                      <Phone size={16} /> Chat on WhatsApp
+                    <a href={mailHref} className="link-line inline-flex items-center justify-center gap-2 px-2 py-3 text-sm text-white/70 hover:text-white">
+                      <EnvelopeSimple size={16} /> Email us instead
                     </a>
                   </div>
 
-                  {/* Direct Contact Links Footer */}
-                  <div className="border-t border-white/10 pt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-400">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={14} className="text-[#CCFF00]" />
-                      <span>Call directly:</span>
-                      <a
-                        href="tel:+9108277630021"
-                        className="text-white hover:text-[#CCFF00] font-mono underline"
-                      >
-                        +91 08277630021
-                      </a>
-                    </div>
-                    <div>
-                      <a
-                        href="mailto:info.axoraa@gmail.com"
-                        className="text-gray-400 hover:text-white transition-colors"
-                      >
-                        info.axoraa@gmail.com
-                      </a>
-                    </div>
-                  </div>
+                  <p className="border-t border-white/10 pt-5 text-sm text-white/55">
+                    Prefer a call?{' '}
+                    <a href={CONTACT.phoneHref} className="link-line tabular text-white">{CONTACT.phoneDisplay}</a>
+                  </p>
                 </form>
               )}
             </div>
@@ -305,6 +285,4 @@ const QuoteModal: React.FC<QuoteModalProps> = ({ isOpen, onClose }) => {
       )}
     </AnimatePresence>
   );
-};
-
-export default QuoteModal;
+}

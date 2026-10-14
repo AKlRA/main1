@@ -1,19 +1,14 @@
-import React from 'react';
 import Hero from '../components/sections/Hero';
+import Assemble from '../components/sections/Assemble';
 import Philosophy from '../components/sections/Philosophy';
-import Marquee from '../components/ui/Marquee';
+import Marquee from '../components/sections/Marquee';
 import Work from '../components/sections/Work';
 import Process from '../components/sections/Process';
 import Expertise from '../components/sections/Expertise';
 import Testimonials from '../components/sections/Testimonials';
-
 import { useDocumentMetadata } from '../hooks/useDocumentMetadata';
 
-interface HomeProps {
-  loading: boolean;
-}
-
-const Home: React.FC<HomeProps> = ({ loading }) => {
+export default function Home() {
   useDocumentMetadata({
     title: 'Axoraa | Premium Websites, Apps, Automations & AI Integrations',
     description: 'Axoraa is a collective of senior developers building high-performance websites, custom mobile apps, workflow automations, and AI integrations to bring businesses into the digital era.',
@@ -21,7 +16,8 @@ const Home: React.FC<HomeProps> = ({ loading }) => {
   });
   return (
     <>
-      <Hero loading={loading} />
+      <Hero />
+      <Assemble />
       <Philosophy />
       <Marquee />
       <Work />
@@ -30,6 +26,4 @@ const Home: React.FC<HomeProps> = ({ loading }) => {
       <Testimonials />
     </>
   );
-};
-
-export default Home;
+}

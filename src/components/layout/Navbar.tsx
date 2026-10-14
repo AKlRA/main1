@@ -1,331 +1,202 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ArrowRight } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { ArrowUpRight } from '@phosphor-icons/react';
+import { gsap, ScrollTrigger, useGSAP } from '../../motion/gsap';
+import { useScrollApi } from '../../motion/scrollContext';
+import { CONTACT, openQuote } from '../../data/contact';
+import TransitionLink from '../chrome/TransitionLink';
 import Magnetic from '../ui/Magnetic';
-import QuoteModal from '../ui/QuoteModal';
-import { premiumEase } from '../../lib/utils';
 
-const Navbar: React.FC = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
-  const [isDarkBg, setIsDarkBg] = useState(true);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+const LEFT = [
+  { label: 'Work', to: '/#work' },
+  { label: 'Process', to: '/#process' },
+];
+const RIGHT = [{ label: 'Collective', to: '/team' }];
+const MENU = [
+  { label: 'Work', to: '/#work' },
+  { label: 'Process', to: '/#process' },
+  { label: 'Expertise', to: '/#expertise' },
+  { label: 'Collective', to: '/team' },
+];
 
-  const navItems = [
-    { name: 'Work', path: '/#work', isHash: true, isAction: false },
-    { name: 'Process', path: '/#process', isHash: true, isAction: false },
-    { name: 'Collective', path: '/team', isHash: false, isAction: false },
-    { name: 'Get Quote', path: '#quote', isHash: false, isAction: true },
-  ];
+/** The curved shoulders that join the notch to the top bezel. */
+function Shoulder({ side }: { side: 'left' | 'right' }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 50 50"
+      className={`absolute top-0 hidden size-12 text-(--chrome) transition-colors duration-500 ease-(--ease-out) md:block ${
+        side === 'left' ? '-left-12 rotate-180' : '-right-12 rotate-90'
+      }`}
+    >
+      <path d="M0 0C0 37.3 9 50 50 50H0V0Z" fill="currentColor" />
+    </svg>
+  );
+}
 
-  const mobileNavItems = [
-    { name: 'WORK', path: '/#work', isAction: false },
-    { name: 'PROCESS', path: '/#process', isAction: false },
-    { name: 'EXPERTISE', path: '/#expertise', isAction: false },
-    { name: 'COLLECTIVE', path: '/team', isAction: false },
-    { name: 'GET A QUOTE', path: '#quote', isAction: true },
-  ];
+export default function Navbar() {
+  const nav = useRef<HTMLElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuTl = useRef<gsap.core.Timeline | null>(null);
+  const { pathname } = useLocation();
+  // The menu belongs to the route it was opened on, so any navigation closes it.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const menuOpen = openOn === pathname;
+  const setMenuOpen = (next: boolean | ((open: boolean) => boolean)) =>
+    setOpenOn((prev) => ((typeof next === 'function' ? next(prev === pathname) : next) ? pathname : null));
+  const { lock, unlock } = useScrollApi();
+
+  // Hide on scroll down, return on scroll up.
+  useGSAP(() => {
+    const el = nav.current!;
+    let hidden = false;
+    const st = ScrollTrigger.create({
+      start: 0,
+      end: 'max',
+      onUpdate: (self) => {
+        const hide = self.direction === 1 && self.scroll() > 240;
+        if (hide === hidden) return;
+        hidden = hide;
+        gsap.to(el, { yPercent: hide ? -130 : 0, duration: 0.45, ease: 'ax.out', overwrite: true });
+      },
+    });
+    return () => st.kill();
+  });
+
+  // Menu timeline: lime panel wipes down, links rise out of their masks.
+  useGSAP(
+    () => {
+      menuTl.current = gsap
+        .timeline({ paused: true })
+        .set(menu.current, { display: 'flex' })
+        .fromTo(menu.current, { clipPath: 'inset(0% 0% 100% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.6, ease: 'ax.inOut' })
+        // Explicit end values: `.from()` would capture whatever offset a previous (StrictMode) run left behind.
+        .fromTo('.menu-link', { yPercent: 110 }, { yPercent: 0, duration: 0.7, ease: 'ax.out', stagger: 0.06 }, '-=0.25')
+        .fromTo('.menu-foot', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4 }, '-=0.45');
+    },
+    { scope: menu },
+  );
 
   useEffect(() => {
-    const handleOpenQuote = () => setQuoteModalOpen(true);
-    window.addEventListener('open-quote-modal', handleOpenQuote);
-    return () => window.removeEventListener('open-quote-modal', handleOpenQuote);
-  }, []);
-
-  useEffect(() => {
-    let scrollTimeout: any;
-    
-    const handleScrollDetect = () => {
-      setIsScrolling(true);
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        setIsScrolling(false);
-      }, 250); // 250ms of stillness marks scroll stop
-    };
-
-    window.addEventListener('scroll', handleScrollDetect);
-    return () => {
-      window.removeEventListener('scroll', handleScrollDetect);
-      clearTimeout(scrollTimeout);
-    };
-  }, []);
-
-  useEffect(() => {
-    const checkBg = () => {
-      // Footer Section (#contact) should be black (on all pages)
-      const contactSection = document.getElementById('contact');
-      if (contactSection) {
-        const rect = contactSection.getBoundingClientRect();
-        if (rect.top <= 60) {
-          setIsDarkBg(false);
-          return;
-        }
-      }
-
-      // If we are on team or pricing page, they are dark backgrounds
-      if (location.pathname === '/team' || location.pathname === '/pricing') {
-        setIsDarkBg(true);
-        return;
-      }
-      
-      // Section 1 (Hero) should be black
-      if (window.scrollY < 300) {
-        setIsDarkBg(false);
-        return;
-      }
-      
-      const workSection = document.getElementById('work');
-      if (workSection) {
-        const rect = workSection.getBoundingClientRect();
-        // If the work section is at the top of viewport (covering y = 60px), it's a light background
-        if (rect.top <= 60 && rect.bottom >= 60) {
-          setIsDarkBg(false);
-          return;
-        }
-      }
-      setIsDarkBg(true);
-    };
-
-    checkBg();
-    window.addEventListener('scroll', checkBg);
-    window.addEventListener('resize', checkBg);
-    return () => {
-      window.removeEventListener('scroll', checkBg);
-      window.removeEventListener('resize', checkBg);
-    };
-  }, [location.pathname]);
-
-  const handleHashLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    e.preventDefault();
-    const hash = path.split('#')[1];
-    
-    if (location.pathname === '/') {
-      const element = document.getElementById(hash);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
-    } else {
-      navigate(path);
+    const tl = menuTl.current;
+    if (!tl) return;
+    if (menuOpen) {
+      lock();
+      tl.timeScale(1).play();
+      const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenOn(null);
+      window.addEventListener('keydown', onKey);
+      menu.current?.querySelector<HTMLElement>('a')?.focus();
+      return () => { window.removeEventListener('keydown', onKey); unlock(); };
     }
-  };
+    tl.timeScale(1.6).reverse();
+  }, [menuOpen, lock, unlock]);
+
+  const link =
+    'link-line py-2 text-[0.8125rem] font-medium uppercase tracking-[0.08em] text-(--chrome-ink)/70 transition-colors duration-200 hover:text-(--chrome-ink)';
 
   return (
     <>
-      <nav 
-        className={`fixed top-3 md:top-5 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] md:w-[calc(100%-2.5rem)] max-w-5xl z-50 rounded-b-2xl md:rounded-b-[2.5rem] shadow-2xl flex justify-between items-center px-6 md:px-12 h-16 md:h-20 border-b transition-all duration-500 ${
-          isDarkBg 
-            ? 'bg-white text-black border-black/5' 
-            : 'bg-[#0a0a0a] text-white border-white/5'
-        }`}
+      <header
+        ref={nav}
+        className="fixed inset-x-0 top-0 flex justify-center px-(--bezel)"
+        style={{ zIndex: menuOpen ? 'calc(var(--z-menu) + 1)' : 'var(--z-chrome)' }}
       >
-        {/* Left negative curve */}
-        <svg 
-          className={`absolute top-0 -left-12 rotate-180 pointer-events-none w-12 h-12 hidden md:block transition-colors duration-500 ${
-            isDarkBg ? 'text-white' : 'text-[#0a0a0a]'
-          }`} 
-          viewBox="0 0 50 50" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
+        <nav
+          aria-label="Primary"
+          className="relative flex h-16 w-full max-w-5xl items-center justify-between rounded-b-[1.25rem] bg-(--chrome) px-5 text-(--chrome-ink) transition-colors duration-500 ease-(--ease-out) md:h-[4.5rem] md:rounded-b-[2rem] md:px-10"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
         >
-          <path d="M0 0C0 37.3 9 50 50 50H0V0Z" fill="currentColor" />
-        </svg>
+          <Shoulder side="left" />
+          <Shoulder side="right" />
 
-        {/* Right negative curve */}
-        <svg 
-          className={`absolute top-0 -right-12 rotate-90 pointer-events-none w-12 h-12 hidden md:block transition-colors duration-500 ${
-            isDarkBg ? 'text-white' : 'text-[#0a0a0a]'
-          }`} 
-          viewBox="0 0 50 50" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M0 0C0 37.3 9 50 50 50H0V0Z" fill="currentColor" />
-        </svg>
-
-        {/* Left Section: Work & Process links (Desktop only) */}
-        <div className="w-1/3 hidden md:flex justify-start items-center">
-          <motion.div
-            animate={{
-              x: isScrolling ? "120px" : "0px",
-              opacity: isScrolling ? 0 : 1,
-              filter: isScrolling ? "blur(4px)" : "blur(0px)"
-            }}
-            transition={{ duration: 0.4, ease: premiumEase }}
-            className={`flex gap-8 font-medium tracking-wide pointer-events-auto text-sm uppercase ${
-              isScrolling ? 'pointer-events-none' : ''
-            } ${
-              isDarkBg ? 'text-black' : 'text-zinc-400'
-            }`}
-          >
-            {navItems.slice(0, 2).map((item) => (
-              <Magnetic key={item.name} strength={0.1}>
-                {item.isHash ? (
-                  <a 
-                    href={item.path} 
-                    onClick={(e) => handleHashLinkClick(e, item.path)}
-                    className={`transition-colors duration-300 p-2 -m-2 block ${
-                      isDarkBg ? 'hover:text-black' : 'hover:text-white'
-                    }`}
-                  >
-                    {item.name}
-                  </a>
-                ) : (
-                  <Link 
-                    to={item.path} 
-                    className={`transition-colors duration-300 p-2 -m-2 block ${
-                      isDarkBg ? 'hover:text-black' : 'hover:text-white'
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                )}
-              </Magnetic>
+          <ul className="hidden flex-1 items-center gap-8 md:flex">
+            {LEFT.map((item) => (
+              <li key={item.to}>
+                <Magnetic strength={0.2}>
+                  <TransitionLink to={item.to} className={link}>{item.label}</TransitionLink>
+                </Magnetic>
+              </li>
             ))}
-          </motion.div>
-        </div>
+          </ul>
 
-        {/* Center Section: Logo (Always Visible & Center) */}
-        <div className="flex-1 md:w-1/3 flex justify-start md:justify-center items-center">
-          <Magnetic strength={0.1}>
-            <Link 
-              to="/" 
-              className={`flex items-center gap-2 pointer-events-auto transition-colors p-2 -m-2 ${
-                isDarkBg ? 'hover:text-[#4A6B00]' : 'hover:text-[#CCFF00]'
-              }`}
-            >
-              <span className="text-base md:text-3xl font-bold tracking-tighter uppercase">AXORAA©</span>
-            </Link>
+          <Magnetic strength={0.15}>
+            <TransitionLink to="/" aria-label="Axoraa, home" className="block py-2 font-display text-lg font-bold tracking-[-0.04em] md:text-[1.75rem]">
+              AXORAA©
+            </TransitionLink>
           </Magnetic>
-        </div>
 
-        {/* Right Section: Collective & Pricing links (Desktop) or Menu Burger (Mobile) */}
-        <div className="w-auto md:w-1/3 flex justify-end items-center gap-6">
-          <motion.div
-            animate={{
-              x: isScrolling ? "-120px" : "0px",
-              opacity: isScrolling ? 0 : 1,
-              filter: isScrolling ? "blur(4px)" : "blur(0px)"
-            }}
-            transition={{ duration: 0.4, ease: premiumEase }}
-            className={`hidden md:flex gap-8 font-medium tracking-wide pointer-events-auto text-sm uppercase ${
-              isScrolling ? 'pointer-events-none' : ''
-            } ${
-              isDarkBg ? 'text-black' : 'text-zinc-400'
-            }`}
-          >
-            {navItems.slice(2, 4).map((item) => (
-              <Magnetic key={item.name} strength={0.1}>
-                {item.isAction ? (
-                  <button
-                    onClick={() => setQuoteModalOpen(true)}
-                    className={`transition-colors duration-300 p-2 -m-2 block font-medium uppercase tracking-wide cursor-pointer ${
-                      isDarkBg ? 'hover:text-[#4A6B00]' : 'hover:text-[#CCFF00]'
-                    }`}
-                  >
-                    {item.name}
-                  </button>
-                ) : item.isHash ? (
-                  <a 
-                    href={item.path} 
-                    onClick={(e) => handleHashLinkClick(e, item.path)}
-                    className={`transition-colors duration-300 p-2 -m-2 block ${
-                      isDarkBg ? 'hover:text-black' : 'hover:text-white'
-                    }`}
-                  >
-                    {item.name}
-                  </a>
-                ) : (
-                  <Link 
-                    to={item.path} 
-                    className={`transition-colors duration-300 p-2 -m-2 block ${
-                      isDarkBg ? 'hover:text-black' : 'hover:text-white'
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                )}
-              </Magnetic>
+          <ul className="hidden flex-1 items-center justify-end gap-8 md:flex">
+            {RIGHT.map((item) => (
+              <li key={item.to}>
+                <Magnetic strength={0.2}>
+                  <TransitionLink to={item.to} className={link}>{item.label}</TransitionLink>
+                </Magnetic>
+              </li>
             ))}
-          </motion.div>
+            <li>
+              <Magnetic strength={0.25}>
+                <button
+                  type="button"
+                  onClick={openQuote}
+                  className="pressable inline-flex items-center gap-1.5 rounded-full bg-lime px-4 py-2 text-[0.8125rem] font-semibold uppercase tracking-[0.08em] text-ink"
+                >
+                  Get a quote
+                </button>
+              </Magnetic>
+            </li>
+          </ul>
 
-          {/* Mobile menu button */}
-          <button 
-            className={`pointer-events-auto md:hidden p-2 rounded-full backdrop-blur-md transition-colors ${
-              isDarkBg ? 'bg-black/10 text-black' : 'bg-white/10 text-white'
-            }`}
-            onClick={() => setMobileMenuOpen(true)}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            className="pressable relative grid size-11 place-items-center rounded-full bg-(--chrome-ink)/10 md:hidden"
           >
-            <Menu size={20} />
+            <span aria-hidden className={`absolute h-[1.5px] w-5 rounded-full bg-current transition-transform duration-300 ease-(--ease-out) ${menuOpen ? 'rotate-45' : '-translate-y-[4px]'}`} />
+            <span aria-hidden className={`absolute h-[1.5px] w-5 rounded-full bg-current transition-transform duration-300 ease-(--ease-out) ${menuOpen ? '-rotate-45' : 'translate-y-[4px]'}`} />
           </button>
+        </nav>
+      </header>
+
+      <div
+        id="mobile-menu"
+        ref={menu}
+        data-surface="lime"
+        aria-hidden={!menuOpen}
+        className="fixed inset-0 hidden flex-col justify-between bg-lime px-6 pb-[calc(env(safe-area-inset-bottom,0px)+2rem)] pt-28 text-ink"
+        style={{ zIndex: 'var(--z-menu)' }}
+      >
+        <ul className="flex flex-col gap-1">
+          {MENU.map((item) => (
+            <li key={item.to} className="split-mask">
+              <TransitionLink
+                to={item.to}
+                onClick={() => setMenuOpen(false)}
+                tabIndex={menuOpen ? 0 : -1}
+                className="menu-link transition-opacity duration-150 active:opacity-60 block font-display text-[clamp(2.5rem,12.5vw,5rem)] font-bold leading-[1.05] tracking-[-0.05em]"
+              >
+                {item.label}
+              </TransitionLink>
+            </li>
+          ))}
+          <li className="split-mask">
+            <button
+              type="button"
+              tabIndex={menuOpen ? 0 : -1}
+              onClick={() => { setMenuOpen(false); openQuote(); }}
+              className="menu-link transition-opacity duration-150 active:opacity-60 flex flex-wrap items-center gap-x-3 text-left font-display text-[clamp(2.5rem,12.5vw,5rem)] font-bold leading-[1.05] tracking-[-0.05em]"
+            >
+              Get a quote <ArrowUpRight className="size-[0.7em]" weight="bold" />
+            </button>
+          </li>
+        </ul>
+        <div className="menu-foot flex flex-col gap-1 border-t border-ink/20 pt-5 text-base font-medium">
+          <a href={`mailto:${CONTACT.email}`} tabIndex={menuOpen ? 0 : -1}>{CONTACT.email}</a>
+          <a href={CONTACT.phoneHref} tabIndex={menuOpen ? 0 : -1} className="tabular">{CONTACT.phoneDisplay}</a>
         </div>
-      </nav>
-
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div 
-            initial={{ clipPath: "polygon(0 0, 100% 0, 100% 0, 0 0)" }}
-            animate={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)" }}
-            exit={{ clipPath: "polygon(0 0, 100% 0, 100% 0, 0 0)" }}
-            transition={{ duration: 0.8, ease: premiumEase }}
-            className="fixed inset-0 bg-[#CCFF00] text-black z-[60] flex flex-col p-6 md:px-12 py-8"
-          >
-            <div className="flex justify-between items-center mb-24">
-              <span className="text-2xl font-bold tracking-tighter">AXORAA©</span>
-              <button onClick={() => setMobileMenuOpen(false)} className="hover:rotate-90 transition-transform bg-black text-white p-2 rounded-full"><X size={24} /></button>
-            </div>
-            
-            <div className="flex flex-col gap-6 text-6xl font-bold tracking-tighter overflow-y-auto pb-20">
-              {mobileNavItems.map((item) => (
-                item.isAction ? (
-                  <button
-                    key={item.name}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      setQuoteModalOpen(true);
-                    }}
-                    className="text-left hover:ml-8 hover:text-white transition-all duration-300 cursor-pointer"
-                  >
-                    {item.name},
-                  </button>
-                ) : item.path.startsWith('/#') ? (
-                  <a 
-                    key={item.name}
-                    href={item.path} 
-                    onClick={(e) => {
-                      setMobileMenuOpen(false);
-                      handleHashLinkClick(e, item.path);
-                    }}
-                    className="hover:ml-8 hover:text-white transition-all duration-300"
-                  >
-                    {item.name},
-                  </a>
-                ) : (
-                  <Link 
-                    key={item.name}
-                    to={item.path} 
-                    onClick={() => setMobileMenuOpen(false)} 
-                    className="hover:ml-8 hover:text-white transition-all duration-300"
-                  >
-                    {item.name},
-                  </Link>
-                )
-              ))}
-              <a href="/#contact" onClick={() => setMobileMenuOpen(false)} className="hover:ml-8 transition-all mt-12 border-b-4 border-black hover:border-white inline-block w-max">HIRE US <ArrowRight className="inline w-12 h-12" /></a>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Interactive Project Quote & Discovery Modal */}
-      <QuoteModal 
-        isOpen={quoteModalOpen} 
-        onClose={() => setQuoteModalOpen(false)} 
-      />
+      </div>
     </>
   );
-};
-
-export default Navbar;
+}
