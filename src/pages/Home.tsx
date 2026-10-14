@@ -1,5 +1,5 @@
 import Hero from '../components/sections/Hero';
-import Showreel from '../components/sections/Showreel';
+import Assemble from '../components/sections/Assemble';
 import Philosophy from '../components/sections/Philosophy';
 import Marquee from '../components/sections/Marquee';
 import Work from '../components/sections/Work';
@@ -17,7 +17,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <Showreel />
+      <Assemble />
       <Philosophy />
       <Marquee />
       <Work />
